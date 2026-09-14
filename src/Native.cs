@@ -1,9 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
+using System.Text;
 
-namespace ClaudePet
+namespace AiPets
 {
     static class Native
     {
@@ -11,12 +13,17 @@ namespace ClaudePet
         public const int WS_EX_TOOLWINDOW = 0x80;
         public const int WS_EX_TOPMOST = 0x8;
         public const int WS_EX_NOACTIVATE = 0x8000000;
+        public const int WS_POPUP = unchecked((int)0x80000000);
+        public const int WM_CLOSE = 0x10;
+        public const int WM_COPYDATA = 0x4A;
         public const int WM_MOUSEACTIVATE = 0x21;
+        public const int WM_APP = 0x8000;
         public const int MA_NOACTIVATE = 3;
 
         const int ULW_ALPHA = 2;
         const uint SWP_NOSIZE = 0x1, SWP_NOMOVE = 0x2, SWP_NOACTIVATE = 0x10;
         static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
+        static readonly IntPtr DPI_AWARENESS_CONTEXT_SYSTEM_AWARE = new IntPtr(-2);
         static readonly IntPtr DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = new IntPtr(-4);
 
         [StructLayout(LayoutKind.Sequential)]
@@ -35,6 +42,9 @@ namespace ClaudePet
             public short biPlanes, biBitCount;
             public int biCompression, biSizeImage, biXPelsPerMeter, biYPelsPerMeter, biClrUsed, biClrImportant;
         }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct COPYDATASTRUCT { public IntPtr dwData; public int cbData; public IntPtr lpData; }
 
         [StructLayout(LayoutKind.Sequential)]
         struct LASTINPUTINFO { public int cbSize; public uint dwTime; }
@@ -57,11 +67,19 @@ namespace ClaudePet
         [DllImport("user32.dll")] static extern bool SetProcessDPIAware();
         [DllImport("shell32.dll")] static extern int SHQueryUserNotificationState(out int state);
         [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
-        [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr hwnd, System.Text.StringBuilder name, int size);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr hwnd, StringBuilder name, int size);
         [DllImport("user32.dll")] static extern bool IsIconic(IntPtr hwnd);
         [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr hwnd, out RECT rect);
         [DllImport("user32.dll")] static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);
         [DllImport("user32.dll")] static extern bool GetMonitorInfo(IntPtr monitor, ref MONITORINFO info);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int RegisterWindowMessage(string name);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern IntPtr FindWindow(string className, string title);
+        [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam);
+        [DllImport("user32.dll")] public static extern IntPtr SendMessageTimeout(IntPtr hwnd, int msg, IntPtr wParam,
+            ref COPYDATASTRUCT lParam, int flags, int timeout, out IntPtr result);
+        [DllImport("user32.dll")] public static extern bool AllowSetForegroundWindow(int processId);
+        [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hwnd);
 
         [StructLayout(LayoutKind.Sequential)]
         struct RECT { public int Left, Top, Right, Bottom; }
@@ -80,7 +98,7 @@ namespace ClaudePet
             IntPtr fg = GetForegroundWindow();
             if (fg == IntPtr.Zero || IsIconic(fg))
                 return false;
-            var cls = new System.Text.StringBuilder(64);
+            var cls = new StringBuilder(64);
             GetClassName(fg, cls, cls.Capacity);
             switch (cls.ToString())
             {
@@ -107,12 +125,24 @@ namespace ClaudePet
                 && r.Right >= info.rcMonitor.Right && r.Bottom >= info.rcMonitor.Bottom;
         }
 
+        /// <summary>Physical pixels for the pets, otherwise Windows blurs the pixel art on scaled displays.</summary>
         public static void EnableDpiAwareness()
         {
-            // physical pixels, otherwise Windows blurs the pixel art on scaled displays
             try
             {
                 if (SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2))
+                    return;
+            }
+            catch (EntryPointNotFoundException) { }
+            SetProcessDPIAware();
+        }
+
+        /// <summary>The tray and its settings window: WinForms scales them once for the system DPI.</summary>
+        public static void EnableSystemDpiAwareness()
+        {
+            try
+            {
+                if (SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_SYSTEM_AWARE))
                     return;
             }
             catch (EntryPointNotFoundException) { }
@@ -130,7 +160,7 @@ namespace ClaudePet
         /// Keeps variables of whoever started the pet — e.g. a Claude Code session's NO_COLOR
         /// or CLAUDE_CODE_CHILD_SESSION — out of the terminals it opens. Null if unavailable.
         /// </summary>
-        public static System.Collections.Generic.Dictionary<string, string> LogonEnvironment()
+        public static Dictionary<string, string> LogonEnvironment()
         {
             const uint TOKEN_QUERY = 0x8, TOKEN_DUPLICATE = 0x2;
             IntPtr token;
@@ -143,7 +173,7 @@ namespace ClaudePet
                     return null;
                 try
                 {
-                    var vars = new System.Collections.Generic.Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    var vars = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                     IntPtr p = block;
                     string entry;
                     while ((entry = Marshal.PtrToStringUni(p)).Length > 0)
@@ -228,6 +258,63 @@ namespace ClaudePet
                 DeleteObject(dib);
                 DeleteDC(dc);
             }
+        }
+    }
+
+    /// <summary>
+    /// Tray ⇄ pet messages. Pets are top-level windows titled "aipets.pet.&lt;id&gt;", the tray owns a
+    /// hidden window "aipets.host". Tray → pet: registered message (reload, launch) or WM_CLOSE.
+    /// Pet → tray: WM_COPYDATA with a text command ("settings claude", "hide hermes", "quit").
+    /// </summary>
+    static class Ipc
+    {
+        public const string HostTitle = "aipets.host";
+        public const int CmdReload = 1, CmdLaunch = 2;
+        public static readonly int CommandMessage = Native.RegisterWindowMessage("aipets.command");
+
+        public static string PetTitle(string id)
+        {
+            return "aipets.pet." + id;
+        }
+
+        public static bool PostToPet(string id, int command)
+        {
+            IntPtr hwnd = Native.FindWindow(null, PetTitle(id));
+            return hwnd != IntPtr.Zero && Native.PostMessage(hwnd, CommandMessage, (IntPtr)command, IntPtr.Zero);
+        }
+
+        public static bool ClosePet(string id)
+        {
+            IntPtr hwnd = Native.FindWindow(null, PetTitle(id));
+            return hwnd != IntPtr.Zero && Native.PostMessage(hwnd, Native.WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
+        }
+
+        /// <summary>Sends a text command to the running tray. False if there is none.</summary>
+        public static bool SendToHost(string text)
+        {
+            IntPtr hwnd = Native.FindWindow(null, HostTitle);
+            if (hwnd == IntPtr.Zero)
+                return false;
+            // this process just got the click: let the tray bring its settings window to the front
+            Native.AllowSetForegroundWindow(-1);
+            IntPtr data = Marshal.StringToHGlobalUni(text);
+            try
+            {
+                var cds = new Native.COPYDATASTRUCT { dwData = IntPtr.Zero, cbData = (text.Length + 1) * 2, lpData = data };
+                IntPtr result;
+                const int SMTO_ABORTIFHUNG = 2;
+                return Native.SendMessageTimeout(hwnd, Native.WM_COPYDATA, IntPtr.Zero, ref cds, SMTO_ABORTIFHUNG, 3000, out result) != IntPtr.Zero;
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(data);
+            }
+        }
+
+        public static string ReadCopyData(IntPtr lParam)
+        {
+            var cds = (Native.COPYDATASTRUCT)Marshal.PtrToStructure(lParam, typeof(Native.COPYDATASTRUCT));
+            return cds.cbData >= 2 ? Marshal.PtrToStringUni(cds.lpData, cds.cbData / 2 - 1) : "";
         }
     }
 }

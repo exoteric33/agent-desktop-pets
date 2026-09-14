@@ -1,7 +1,7 @@
 # build output (rebuild with .\build.ps1)
-ClaudePet.exe
+aipets.exe
 *.tmp
 
-# sprite generator leftovers; atlas.png / atlas.txt / icon.ico stay tracked so build.ps1 works without Python
-art/__pycache__/
-art/build/preview_*.png
+# sprite generator leftovers; pets/*/sprites and art/aipets.ico stay tracked so build.ps1 works without Python
+__pycache__/
+pets/*/art/preview/

@@ -1,0 +1,55 @@
+cell 89 158
+frame normal_0 0 0
+frame blink_0 89 0
+frame look_0 178 0
+frame hover_0 267 0
+frame happy_0 356 0
+frame sleep_0 445 0
+frame m_normal_0 534 0
+frame m_blink_0 623 0
+frame m_look_0 0 158
+frame m_hover_0 89 158
+frame m_happy_0 178 158
+frame m_sleep_0 267 158
+sprite spark3 0 316 7 7 3 3
+sprite spark2 8 316 5 5 2 2
+sprite spark1 14 316 3 3 1 1
+sprite spark0 18 316 1 1 0 0
+sprite z2 20 316 6 6 3 3
+sprite z1 27 316 5 5 2 2
+sprite z0 33 316 4 4 2 2
+sprite note1 38 316 6 8 3 4
+sprite note2 45 316 7 7 3 3
+sprite note0 53 316 3 3 1 1
+sprite bubble_r_on 57 316 22 17 0 16
+sprite bubble_r_off 80 316 22 17 0 16
+sprite bubble_r_spin0 103 316 22 17 0 16
+sprite bubble_r_spin1 126 316 22 17 0 16
+sprite bubble_r_spin2 149 316 22 17 0 16
+sprite bubble_r_spin3 172 316 22 17 0 16
+sprite bubble_r_spin4 195 316 22 17 0 16
+sprite bubble_r_spin5 218 316 22 17 0 16
+sprite bubble_r_spin6 241 316 22 17 0 16
+sprite bubble_r_spin7 264 316 22 17 0 16
+sprite bubble_r_wait 287 316 22 17 0 16
+sprite bubble_r_done 310 316 22 17 0 16
+sprite bubble_l_on 333 316 22 17 21 16
+sprite bubble_l_off 356 316 22 17 21 16
+sprite bubble_l_spin0 379 316 22 17 21 16
+sprite bubble_l_spin1 402 316 22 17 21 16
+sprite bubble_l_spin2 425 316 22 17 21 16
+sprite bubble_l_spin3 448 316 22 17 21 16
+sprite bubble_l_spin4 471 316 22 17 21 16
+sprite bubble_l_spin5 494 316 22 17 21 16
+sprite bubble_l_spin6 517 316 22 17 21 16
+sprite bubble_l_spin7 540 316 22 17 21 16
+sprite bubble_l_wait 563 316 22 17 21 16
+sprite bubble_l_done 586 316 22 17 21 16
+anchor bubble 34 10
+anchor zzz 41 3
+anchor logo 63 23
+anchor head 47 23
+facing left
+anim twinkle note1 note1 note1 note1 note0
+anim twinkle2 note2 note2 note2 note2 note0
+anim spin spin0 spin1 spin2 spin3 spin4 spin5 spin6 spin7

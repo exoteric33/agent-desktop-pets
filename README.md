@@ -1,29 +1,72 @@
-# ClaudePet
+# aipets
 
-Pixel-Art-Desktop-Pet für Windows. Sie steht auf der Taskleiste, öffnet per Klick Claude Code im Windows Terminal und zeigt an, ob Claude Code gerade arbeitet, auf dich wartet oder fertig ist.
+Pixel-Art-Desktop-Pets für Windows, eins pro KI-Agent. Die Pets sitzen auf der Taskleiste. Ein Klick öffnet ihren Agenten im Terminal, und sie zeigen an, ob er gerade arbeitet, auf dich wartet oder fertig ist.
+
+| Pet | Klick öffnet | Status kommt von |
+|---|---|---|
+| **Claude** | Claude Code im Windows Terminal | Claude-Code-Hooks |
+| **Hermes** | Hermes Agent in PowerShell (im Windows Terminal) | Hermes-Shell-Hooks |
 
 ## Schnellstart
 
-1. **Bauen:** `.\build.ps1` erzeugt `ClaudePet.exe` mit dem C#-Compiler, der in Windows eingebaut ist; installieren musst du nichts.
-   `.\build.ps1 -Art` erzeugt vorher die Sprites aus `art\source.png` neu. Dafür brauchst du Python mit `numpy` und `Pillow`.
-2. **Starten:** `ClaudePet.exe` doppelklicken, dann Rechtsklick auf das Pet → „Mit Windows starten“.
-3. **Status-Anzeige:** folgende Hooks in `%USERPROFILE%\.claude\settings.json` eintragen und den Pfad anpassen. Danach einmal `/hooks` öffnen oder Claude Code neu starten.
+1. **Bauen:** `.\build.ps1` erzeugt `aipets.exe` mit dem C#-Compiler, der in Windows eingebaut ist. Installieren musst du nichts.
+   `.\build.ps1 -Art` erzeugt vorher App-Icon und Sprites neu. Dafür brauchst du Python mit `numpy` und `Pillow`.
+2. **Starten:** `aipets.exe` doppelklicken. Die exe muss neben dem Ordner `pets\` liegen.
+   Im Infobereich der Taskleiste (bei den ausgeblendeten Symbolen hinter `^`) erscheint das aipets-Icon:
+   - **Linksklick:** Einstellungen. Dort kannst du Pets ein- und ausblenden und Größe, Programm, Argumente, Terminal und Arbeitsordner einstellen. Unten schaltest du „Mit Windows starten“ ein.
+   - **Rechtsklick:** Menü mit allen Pets, Autostart und Beenden.
+3. **Status-Anzeige:** Hooks eintragen, siehe unten.
+
+**Hintergrund:** Das Tray-Programm startet jedes Pet als eigenen Prozess (`aipets.exe --pet <id>`). Stürzt ein Pet ab oder wird es beendet, startet das Tray-Programm es neu. Beendest du das Tray-Programm, verschwinden auch die Pets.
+
+**Pet-Rechtsklick:** öffnen, Arbeitsordner, Größe, zurück in die Ecke, ausblenden, Einstellungen, aipets beenden.
+
+Ein Klick startet Claude Code mit `--dangerously-skip-permissions` und Hermes mit `--yolo`. Das kannst du in den Einstellungen oder in `pets\<id>\pet.ini` ändern.
+
+## Hooks für Claude Code
+
+In `%USERPROFILE%\.claude\settings.json` eintragen und den Pfad anpassen. Danach einmal `/hooks` öffnen oder Claude Code neu starten.
 
 ```json
 "hooks": {
-  "UserPromptSubmit":   [{ "hooks": [{ "type": "command", "command": "C:\\Pfad\\zu\\ClaudePet.exe", "args": ["--hook", "working"], "timeout": 10 }] }],
-  "PostToolUse":        [{ "matcher": "*", "hooks": [{ "type": "command", "command": "C:\\Pfad\\zu\\ClaudePet.exe", "args": ["--hook", "resume"], "async": true }] }],
-  "PostToolUseFailure": [{ "matcher": "*", "hooks": [{ "type": "command", "command": "C:\\Pfad\\zu\\ClaudePet.exe", "args": ["--hook", "resume"], "async": true }] }],
-  "Notification":       [{ "matcher": "permission_prompt|elicitation_dialog|elicitation_url_dialog|agent_needs_input", "hooks": [{ "type": "command", "command": "C:\\Pfad\\zu\\ClaudePet.exe", "args": ["--hook", "waiting"], "timeout": 10 }] }],
-  "Stop":               [{ "hooks": [{ "type": "command", "command": "C:\\Pfad\\zu\\ClaudePet.exe", "args": ["--hook", "done"], "timeout": 10 }] }],
-  "SessionEnd":         [{ "hooks": [{ "type": "command", "command": "C:\\Pfad\\zu\\ClaudePet.exe", "args": ["--hook", "end"], "timeout": 10 }] }]
+  "UserPromptSubmit":   [{ "hooks": [{ "type": "command", "command": "C:\\Pfad\\zu\\aipets.exe", "args": ["--hook", "claude", "working"], "timeout": 10 }] }],
+  "PostToolUse":        [{ "matcher": "*", "hooks": [{ "type": "command", "command": "C:\\Pfad\\zu\\aipets.exe", "args": ["--hook", "claude", "resume"], "async": true }] }],
+  "PostToolUseFailure": [{ "matcher": "*", "hooks": [{ "type": "command", "command": "C:\\Pfad\\zu\\aipets.exe", "args": ["--hook", "claude", "resume"], "async": true }] }],
+  "Notification":       [{ "matcher": "permission_prompt|elicitation_dialog|elicitation_url_dialog|agent_needs_input", "hooks": [{ "type": "command", "command": "C:\\Pfad\\zu\\aipets.exe", "args": ["--hook", "claude", "waiting"], "timeout": 10 }] }],
+  "Stop":               [{ "hooks": [{ "type": "command", "command": "C:\\Pfad\\zu\\aipets.exe", "args": ["--hook", "claude", "done"], "timeout": 10 }] }],
+  "SessionEnd":         [{ "hooks": [{ "type": "command", "command": "C:\\Pfad\\zu\\aipets.exe", "args": ["--hook", "claude", "end"], "timeout": 10 }] }]
 }
 ```
 
-Ein Klick startet Claude Code mit `--dangerously-skip-permissions`. Das kannst du über `ClaudeArgs` in `src\Launcher.cs` ändern.
+## Hooks für Hermes Agent
+
+In die `config.yaml` von Hermes eintragen. Unter Windows liegt sie in `%HERMES_HOME%`, sonst in `~/.hermes/`. Pfade in einfachen Anführungszeichen, sonst liest YAML die Backslashes als Escapes.
+
+```yaml
+hooks:
+  pre_llm_call:
+    - command: 'C:\Pfad\zu\aipets.exe --hook hermes working'
+      timeout: 10
+  pre_approval_request:
+    - command: 'C:\Pfad\zu\aipets.exe --hook hermes waiting'
+      timeout: 10
+  post_approval_response:
+    - command: 'C:\Pfad\zu\aipets.exe --hook hermes resume'
+      timeout: 10
+  on_session_end:
+    - command: 'C:\Pfad\zu\aipets.exe --hook hermes done'
+      timeout: 10
+  on_session_finalize:
+    - command: 'C:\Pfad\zu\aipets.exe --hook hermes end'
+      timeout: 10
+```
+
+Hermes fragt beim nächsten Start einmal pro Hook, ob er laufen darf. Alternativ startest du Hermes einmal mit `hermes --accept-hooks`. Prüfen kannst du das mit `hermes hooks list`.
+
+Ob die Hooks eingerichtet sind, zeigen auch die Einstellungen unter „Statusanzeige“.
 
 ## Mehr
 
 In [PET-BAUANLEITUNG.md](PET-BAUANLEITUNG.md) findest du Aufbau, Art-Pipeline, Status-Protokoll, eine Checkliste für neue Pets und bekannte Stolperfallen.
 
-> `art/source.png` basiert auf Fan-Art eines fremden Artists. Halte das Repo privat oder ersetze das Bild (samt `art/build`), bevor du es veröffentlichst.
+> Die Bildvorlagen in `pets/*/art/` sind Fan-Art fremder Artists bzw. nicht selbst gezeichnet. Halte das Repo privat oder ersetze die Bilder (samt `sprites/`), bevor du es veröffentlichst.

@@ -3,49 +3,62 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 
-namespace ClaudePet
+namespace AiPets
 {
-    /// <summary>Opens Claude Code in a new Windows Terminal window (plain console as fallback).</summary>
+    /// <summary>Opens a pet's program in a new Windows Terminal window (plain console as fallback).</summary>
     static class Launcher
     {
         public static bool DryRun;
 
-        // the user always works without permission prompts (their explicit choice)
-        const string ClaudeArgs = "--dangerously-skip-permissions";
-
-        public static void Launch(string workDir)
+        public static void Launch(PetInfo pet, PetSettings s)
         {
-            ProcessStartInfo psi = BuildStartInfo(workDir);
+            ProcessStartInfo psi = BuildStartInfo(pet, s);
             Log.Write((DryRun ? "dry-run: " : "launch: ") + psi.FileName + " " + psi.Arguments
                 + (psi.EnvironmentVariables.ContainsKey("CLAUDECODE") ? "  [inherited env!]" : ""));
             if (!DryRun)
                 Process.Start(psi).Dispose();
         }
 
-        public static ProcessStartInfo BuildStartInfo(string workDir)
+        /// <summary>
+        /// shell=direct: the terminal runs the program itself (tab closes when it exits);
+        /// shell=powershell / cmd: the program runs inside that shell, which stays open afterwards.
+        /// </summary>
+        public static ProcessStartInfo BuildStartInfo(PetInfo pet, PetSettings s)
         {
             // wt hands the caller's environment to the new tab, so start from a clean
             // logon environment (also picks up PATH changes made while the pet runs)
             Dictionary<string, string> env = Native.LogonEnvironment();
             string path = env != null && env.ContainsKey("PATH") ? env["PATH"] : Environment.GetEnvironmentVariable("PATH");
 
-            string claude = FindClaude(path);
-            if (claude == null)
-                throw new FileNotFoundException(
-                    "Claude Code wurde nicht gefunden.\n\nErwartet unter %USERPROFILE%\\.local\\bin\\claude.exe oder im PATH.");
-            if (!Directory.Exists(workDir))
-                workDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            string program = Resolve(s.Program, pet.Find, path);
+            if (program == null)
+                throw new FileNotFoundException(pet.Name + ": \"" + s.Program + "\" wurde nicht gefunden.\n\n"
+                    + "Trag in den Einstellungen den vollen Pfad ein oder nimm den Ordner in den PATH auf.");
+            string workDir = Directory.Exists(s.WorkDir) ? s.WorkDir : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            string args = (s.Args ?? "").Trim();
 
-            // .cmd shims (npm installs) need cmd.exe; the native claude.exe runs directly
-            string command = claude.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase)
-                ? "cmd.exe /c " + Quote(claude)
-                : Quote(claude);
-            command += " " + ClaudeArgs;
+            string command;
+            switch (s.Shell)
+            {
+                case "powershell":
+                    string call = "& '" + program.Replace("'", "''") + "'" + (args.Length > 0 ? " " + args : "");
+                    command = "powershell.exe -NoLogo -NoExit -Command \"" + call.Replace("\"", "\\\"") + "\"";
+                    break;
+                case "cmd":
+                    command = "cmd.exe /k \"" + Quote(program) + (args.Length > 0 ? " " + args : "") + "\"";
+                    break;
+                default:
+                    // .cmd shims (npm installs) need cmd.exe; a real exe runs directly
+                    command = (IsBatch(program) ? "cmd.exe /c " + Quote(program) : Quote(program)) + (args.Length > 0 ? " " + args : "");
+                    break;
+            }
 
             ProcessStartInfo psi;
             string terminal = FindWindowsTerminal(path);
             if (terminal != null)
                 psi = new ProcessStartInfo(terminal, "-d " + Quote(TerminalDir(workDir)) + " " + command);
+            else if (s.Shell == "powershell" || s.Shell == "cmd")
+                psi = new ProcessStartInfo(command.Substring(0, command.IndexOf(' ')), command.Substring(command.IndexOf(' ') + 1));
             else
                 psi = new ProcessStartInfo("cmd.exe", "/k \"" + command + "\"");
             psi.UseShellExecute = false;
@@ -59,13 +72,40 @@ namespace ClaudePet
             return psi;
         }
 
-        static string FindClaude(string path)
+        /// <summary>
+        /// Full path of the program: a path as given, else the pet's known install locations
+        /// ("find" in pet.ini, only if they are this program), else the PATH.
+        /// </summary>
+        public static string Resolve(string program, string find, string path)
         {
-            string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            string native = Path.Combine(home, @".local\bin\claude.exe");
-            if (File.Exists(native))
-                return native;
-            return FindOnPath(path, "claude.exe") ?? FindOnPath(path, "claude.cmd");
+            program = Environment.ExpandEnvironmentVariables((program ?? "").Trim().Trim('"'));
+            if (program.Length == 0)
+                return null;
+            if (program.IndexOf('\\') >= 0 || program.IndexOf('/') >= 0)
+                return File.Exists(program) ? Path.GetFullPath(program) : null;
+
+            string bare = Path.GetFileNameWithoutExtension(program);
+            foreach (string hint in (find ?? "").Split(';'))
+            {
+                string candidate = Environment.ExpandEnvironmentVariables(hint.Trim());
+                if (candidate.Length > 0 && File.Exists(candidate)
+                    && string.Equals(Path.GetFileNameWithoutExtension(candidate), bare, StringComparison.OrdinalIgnoreCase))
+                    return candidate;
+            }
+            if (Path.HasExtension(program))
+                return FindOnPath(path, program);
+            foreach (string ext in new[] { ".exe", ".cmd", ".bat", ".com" })
+            {
+                string found = FindOnPath(path, program + ext);
+                if (found != null)
+                    return found;
+            }
+            return null;
+        }
+
+        static bool IsBatch(string file)
+        {
+            return file.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase) || file.EndsWith(".bat", StringComparison.OrdinalIgnoreCase);
         }
 
         static string FindWindowsTerminal(string path)

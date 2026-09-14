@@ -8,13 +8,16 @@ using System.Threading;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
-namespace ClaudePet
+namespace AiPets
 {
+    /// <summary>
+    /// One pet on the desktop. What she can do comes from her atlas: faces (normal, blink, happy
+    /// and optionally hover, look, sleep, drag), idle phases, bounce frames, particle anims.
+    /// </summary>
     sealed class PetForm : Form
     {
         // room around the character cell for the speech bubble and particles (cell pixels)
         const int PadX = 26, PadTop = 20;
-        const int Phases = 8;
         const int IdleStepMs = 260, SleepStepMs = 620;
         const int SleepAfterMs = 60 * 1000;
         const int BubbleDelayMs = 120;
@@ -23,7 +26,7 @@ namespace ClaudePet
         static readonly int[] BounceMs = { 40, 60, 40, 40, 40, 60, 60, 50, 50 };
         static readonly string[] SparkFrames = { "spark1", "spark2", "spark3", "spark2", "spark1", "spark0" };
         static readonly string[] ZFrames = { "z0", "z1", "z2" };
-        static readonly int[] SpinFrames = { 0, 1, 2, 3, 4, 3, 2, 1 };
+        static readonly string[] PulseSpinner = { "spin0", "spin1", "spin2", "spin3", "spin4", "spin3", "spin2", "spin1" };
 
         sealed class Particle
         {
@@ -33,14 +36,22 @@ namespace ClaudePet
             public string[] Frames;
         }
 
+        readonly PetInfo pet;
+        readonly Process host;          // the tray that started this pet; null when run on its own
         readonly Atlas atlas;
-        readonly Settings settings;
         readonly ContextMenuStrip menu;
         readonly System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer();
         readonly Stopwatch clock = Stopwatch.StartNew();
         readonly Random rng = new Random();
         readonly List<Particle> particles = new List<Particle>();
 
+        // what this atlas offers
+        readonly bool canBounce, hasHover, hasLook, hasSleep, hasDrag;
+        readonly string[] burstFrames, zFrames, spinFrames;
+        readonly List<string[]> twinkles;
+
+        PetSettings settings;
+        DateTime settingsStamp;
         Native.LayeredSurface surface;
         Graphics gfx;
         int scale;
@@ -50,36 +61,54 @@ namespace ClaudePet
 
         long now;
         int phase;
-        long phaseAt, blinkUntil, nextBlink, secondBlinkAt = -1, happyUntil, bounceAt = -1;
-        long nextIdleAction, nextZ, hoverSince, nextTopmost, nextFullscreenCheck;
-        long hintUntil = 2800;      // show the ">_" bubble once after start
+        long phaseAt, blinkUntil, nextBlink, secondBlinkAt = -1, happyUntil, smileUntil, lookUntil, bounceAt = -1;
+        long nextIdleAction, nextZ, hoverSince, nextTopmost, nextFullscreenCheck, nextHousekeeping;
+        long hintUntil = 2800;      // show the prompt bubble once after start
         long lastLaunch = long.MinValue / 2;
         bool sleeping, hovered, menuOpen, hiddenForFullscreen;
         bool pressed, dragging;
         Point pressCursor, pressAnchor;
 
-        // Claude Code activity, reported by the hooks (see Sessions.cs); done times are unix ms
-        readonly SessionMonitor sessions = new SessionMonitor();
-        ClaudeState claude;
-        long nextSessionScan, nextStatusFx;
-        long doneShownSince, doneInputSince, doneAcknowledged = SessionStatus.UnixNow();
+        // agent activity reported by hooks (see Status.cs); done times are unix ms
+        readonly StatusMonitor status;
+        AgentState agent;
+        long nextStatusScan, nextStatusFx;
+        long doneShownSince, doneInputSince, doneAcknowledged = StatusEntry.UnixNow();
 
-        public PetForm()
+        public PetForm(PetInfo pet, Process host)
         {
-            atlas = Atlas.FromResources();
-            settings = Settings.Load();
+            this.pet = pet;
+            this.host = host;
+            atlas = Atlas.Load(pet.SpritesDir);
+            settings = PetSettings.From(pet, Store.Load());
+            settingsStamp = Store.Stamp();
+            status = pet.Status.Length > 0 ? new StatusMonitor(pet.Status) : null;
+
+            canBounce = atlas.HasFrame("bounce_1");
+            hasHover = atlas.HasFrame("hover_0");
+            hasLook = atlas.HasFrame("look_0");
+            hasSleep = atlas.HasFrame("sleep_0");
+            hasDrag = atlas.HasFrame("drag_0");
+            burstFrames = atlas.Anim("burst", SparkFrames);
+            zFrames = atlas.Anim("z", ZFrames);
+            spinFrames = atlas.Anim("spin", PulseSpinner);
+            twinkles = atlas.AnimsWithPrefix("twinkle");
+            if (twinkles.Count == 0)
+                twinkles.Add(SparkFrames);
 
             FormBorderStyle = FormBorderStyle.None;
             ShowInTaskbar = false;
             StartPosition = FormStartPosition.Manual;
             TopMost = true;
-            Text = "Claude Pet";
+            Text = Ipc.PetTitle(pet.Id);
             Cursor = Cursors.Hand;
 
             scale = settings.Scale > 0 ? settings.Scale : DefaultScale();
             anchor = settings.HasPosition ? Clamp(new Point(settings.X, settings.Y), true) : HomeAnchor();
-            mirrored = FacesLeft(anchor, false);
+            mirrored = WantsMirror(anchor, false);
             menu = BuildMenu();
+            Log.Write("start at " + anchor.X + "," + anchor.Y + " (home " + HomeAnchor().X + ", scale " + scale
+                + ", work area " + Screen.PrimaryScreen.WorkingArea + ")");
 
             nextBlink = 3200;
             nextIdleAction = 9000;
@@ -111,6 +140,14 @@ namespace ClaudePet
                 m.Result = (IntPtr)Native.MA_NOACTIVATE;   // clicking the pet never steals focus
                 return;
             }
+            if (m.Msg == Ipc.CommandMessage)
+            {
+                if ((int)m.WParam == Ipc.CmdReload)
+                    ReloadSettings();
+                else if ((int)m.WParam == Ipc.CmdLaunch)
+                    OpenAgent();
+                return;
+            }
             base.WndProc(ref m);
         }
 
@@ -137,6 +174,9 @@ namespace ClaudePet
         int CanvasW { get { return atlas.CellW + 2 * PadX; } }
         int CanvasH { get { return atlas.CellH + PadTop; } }
 
+        /// <summary>She currently looks to the left (art direction combined with mirroring).</summary>
+        bool LooksLeft { get { return atlas.FacingLeft != mirrored; } }
+
         Rectangle WindowRect()
         {
             int w = CanvasW * scale, h = CanvasH * scale;
@@ -152,7 +192,7 @@ namespace ClaudePet
         Point HomeAnchor()
         {
             Rectangle wa = Screen.PrimaryScreen.WorkingArea;
-            return new Point(wa.Right - (atlas.CellW / 2) * scale - 12 * scale, wa.Bottom);
+            return new Point(wa.Right - (atlas.CellW / 2) * scale - pet.Home * scale, wa.Bottom);
         }
 
         Point Clamp(Point p, bool snapToTaskbar)
@@ -164,18 +204,20 @@ namespace ClaudePet
             int minY = vs.Top + (CanvasH - PadTop - 4) * scale;   // keep the top of her head on screen
             p.Y = Math.Max(minY, Math.Min(wa.Bottom, p.Y));
             if (snapToTaskbar && wa.Bottom - p.Y < 18 * scale)
-                p.Y = wa.Bottom;   // she stands on the taskbar edge, legs hidden behind it
+                p.Y = wa.Bottom;   // she sits / stands on the taskbar edge
             return p;
         }
 
-        bool FacesLeft(Point p, bool current)
+        /// <summary>Mirror the frames so she looks towards the middle of the screen she is on.</summary>
+        bool WantsMirror(Point p, bool currentlyMirrored)
         {
-            // look towards the middle of the screen she is on
-            int mid = Screen.FromPoint(p).WorkingArea.Left + Screen.FromPoint(p).WorkingArea.Width / 2;
+            Rectangle wa = Screen.FromPoint(p).WorkingArea;
+            int mid = wa.Left + wa.Width / 2;
             int hysteresis = 12 * scale;
-            if (current)
-                return p.X > mid - hysteresis;
-            return p.X > mid + hysteresis;
+            bool lookLeft = (atlas.FacingLeft != currentlyMirrored)
+                ? p.X > mid - hysteresis
+                : p.X > mid + hysteresis;
+            return lookLeft != atlas.FacingLeft;
         }
 
         void ApplyScale(int newScale)
@@ -192,14 +234,48 @@ namespace ClaudePet
             Render(true);
         }
 
+        void MoveTo(Point p, bool snap)
+        {
+            anchor = Clamp(p, snap);
+            mirrored = WantsMirror(anchor, mirrored);
+            Bounds = WindowRect();
+            Render(true);
+        }
+
         void OnDisplayChanged(object sender, EventArgs e)
         {
             BeginInvoke((MethodInvoker)delegate
             {
-                anchor = Clamp(anchor, true);
-                Bounds = WindowRect();
-                Render(true);
+                MoveTo(settings.HasPosition ? anchor : HomeAnchor(), true);
             });
+        }
+
+        /// <summary>settings.ini changed (tray settings window, "back to the corner", another size).</summary>
+        void ReloadSettings()
+        {
+            settingsStamp = Store.Stamp();
+            PetSettings s = PetSettings.From(pet, Store.Load());
+            int newScale = s.Scale > 0 ? s.Scale : DefaultScale();
+            settings = s;
+            if (newScale != scale)
+            {
+                ApplyScale(newScale);
+                if (!s.HasPosition)
+                    MoveTo(HomeAnchor(), true);
+                SavePosition();
+                return;
+            }
+            if (dragging)
+                return;
+            if (!s.HasPosition)
+            {
+                MoveTo(HomeAnchor(), true);
+                SavePosition();
+            }
+            else if (s.X != anchor.X || s.Y != anchor.Y)
+            {
+                MoveTo(new Point(s.X, s.Y), true);
+            }
         }
 
         // ------------------------------------------------------------------ animation
@@ -207,17 +283,28 @@ namespace ClaudePet
         void Tick()
         {
             now = clock.ElapsedMilliseconds;
-            if (now >= nextSessionScan)
+            if (now >= nextHousekeeping)
             {
-                UpdateClaudeState();
-                nextSessionScan = now + 500;
+                nextHousekeeping = now + 1000;
+                if (host != null && host.HasExited)
+                {
+                    Close();   // the tray is gone (quit or killed): don't linger without it
+                    return;
+                }
+                if (Store.Stamp() != settingsStamp)
+                    ReloadSettings();
+            }
+            if (status != null && now >= nextStatusScan)
+            {
+                UpdateAgentState();
+                nextStatusScan = now + 500;
             }
             UpdateHover();
             UpdateSleep();
 
             if (now - phaseAt >= (sleeping ? SleepStepMs : IdleStepMs))
             {
-                phase = (phase + 1) % Phases;
+                phase = (phase + 1) % atlas.Phases;
                 phaseAt = now;
             }
             if (!sleeping && now >= nextBlink)
@@ -244,14 +331,14 @@ namespace ClaudePet
             }
             if (!sleeping && !dragging && now >= nextStatusFx)
             {
-                if (claude == ClaudeState.Working)
+                if (agent == AgentState.Working)
                 {
-                    SpawnTwinkle();   // thinking sparkles from the shirt logo
+                    SpawnTwinkle();   // thinking sparkles / music while the agent works
                     nextStatusFx = now + 2600;
                 }
-                else if (claude == ClaudeState.Waiting)
+                else if (agent == AgentState.Waiting)
                 {
-                    bounceAt = now;   // hop now and then so you notice she needs you
+                    CallForAttention();
                     nextStatusFx = now + 3500;
                 }
             }
@@ -270,7 +357,7 @@ namespace ClaudePet
             Render(false);
 
             // fast ticks only while something moves quickly; idling stays cheap
-            int interval = particles.Count > 0 || bounceAt >= 0 || pressed ? 33 : claude == ClaudeState.Working ? 55 : 80;
+            int interval = particles.Count > 0 || bounceAt >= 0 || pressed ? 33 : agent == AgentState.Working ? 55 : 80;
             if (timer.Interval != interval)
                 timer.Interval = interval;
         }
@@ -290,25 +377,25 @@ namespace ClaudePet
             hovered = over;
         }
 
-        /// <summary>Spinner while Claude works, "?" while it waits for you, a check mark when it is done.</summary>
-        void UpdateClaudeState()
+        /// <summary>Spinner while the agent works, "?" while it waits for you, a check mark when it is done.</summary>
+        void UpdateAgentState()
         {
-            ClaudeState previous = claude;
-            sessions.Scan();
-            claude = sessions.State;
-            if (claude == ClaudeState.Waiting && previous != ClaudeState.Waiting)
+            AgentState previous = agent;
+            status.Scan();
+            agent = status.State;
+            if (agent == AgentState.Waiting && previous != AgentState.Waiting)
             {
-                bounceAt = now;
+                CallForAttention();
                 nextStatusFx = now + 3500;
             }
 
-            long wall = SessionStatus.UnixNow();
-            if (sessions.LatestDone > doneAcknowledged && sessions.LatestDone > doneShownSince)
+            long wall = StatusEntry.UnixNow();
+            if (status.LatestDone > doneAcknowledged && status.LatestDone > doneShownSince)
             {
-                doneShownSince = sessions.LatestDone;
+                doneShownSince = status.LatestDone;
                 doneInputSince = 0;
-                if (claude == ClaudeState.Idle)
-                    bounceAt = now;
+                if (agent == AgentState.Idle)
+                    Cheer();
             }
             if (doneShownSince > 0 && wall - doneShownSince > 5000)
             {
@@ -330,29 +417,70 @@ namespace ClaudePet
         void UpdateSleep()
         {
             uint idle = Native.IdleMilliseconds();
-            bool claudeNeedsHer = claude != ClaudeState.Idle || doneShownSince > 0;
-            if (!sleeping && idle > SleepAfterMs && !hovered && !dragging && !menuOpen && !claudeNeedsHer)
+            bool agentNeedsHer = agent != AgentState.Idle || doneShownSince > 0;
+            if (!sleeping && idle > SleepAfterMs && !hovered && !dragging && !menuOpen && !agentNeedsHer)
             {
                 sleeping = true;
                 nextZ = now + 500;
             }
-            else if (sleeping && (idle < 1000 || hovered || claudeNeedsHer))
+            else if (sleeping && (idle < 1000 || hovered || agentNeedsHer))
             {
                 sleeping = false;
                 happyUntil = now + 900;
-                particles.RemoveAll(p => p.Frames == ZFrames);
+                particles.RemoveAll(p => p.Frames == zFrames);
             }
         }
 
         void IdleAction()
         {
-            int roll = rng.Next(100);
-            if (roll < 45)
-                happyUntil = now + 1600;
-            else if (roll < 80)
+            // smile 35, twinkle 30, hop 15 (if she can), look up 30 (if she can)
+            int roll = rng.Next(65 + (canBounce ? 15 : 0) + (hasLook ? 30 : 0));
+            if (roll < 35)
+                smileUntil = now + 1600;
+            else if (roll < 65)
                 SpawnTwinkle();
-            else
+            else if (canBounce && roll < 80)
                 bounceAt = now;
+            else
+                lookUntil = now + 1400 + rng.Next(1200);
+        }
+
+        /// <summary>The agent needs you: hop, or (a pet without a body animation) look up with a twinkle.</summary>
+        void CallForAttention()
+        {
+            if (canBounce)
+            {
+                bounceAt = now;
+                return;
+            }
+            lookUntil = now + 1500;
+            SpawnTwinkle();
+        }
+
+        void Cheer()
+        {
+            if (canBounce)
+                bounceAt = now;
+            else
+                happyUntil = now + 1400;
+        }
+
+        string FaceName()
+        {
+            if (dragging)
+                return hasDrag ? "drag" : "happy";
+            if (sleeping)
+                return hasSleep ? "sleep" : "blink";
+            if (now < happyUntil)
+                return "happy";
+            bool done = doneShownSince > 0 && agent == AgentState.Idle;
+            if (hovered || done || now < smileUntil)
+                return hasHover ? (now < blinkUntil ? "blink" : "hover") : "happy";
+            if (now < blinkUntil)
+                return "blink";
+            if (now < lookUntil && hasLook)
+                return "look";
+            return "normal";
         }
 
         string FrameName()
@@ -360,7 +488,7 @@ namespace ClaudePet
             if (bounceAt >= 0)
             {
                 long t = now - bounceAt;
-                for (int i = 0; i < BounceSteps.Length; i++)
+                for (int i = 0; i < BounceSteps.Length && canBounce; i++)
                 {
                     if (t < BounceMs[i])
                         return "bounce_" + BounceSteps[i];
@@ -368,32 +496,23 @@ namespace ClaudePet
                 }
                 bounceAt = -1;
             }
-            string face;
-            if (dragging)
-                face = "happy";
-            else if (sleeping)
-                face = "blink";
-            else if (hovered || now < happyUntil || (doneShownSince > 0 && claude == ClaudeState.Idle))
-                face = "happy";
-            else if (now < blinkUntil)
-                face = "blink";
-            else
-                face = "normal";
-            return face + "_" + phase;
+            string face = FaceName();
+            string name = face + "_" + phase;
+            return atlas.HasFrame(name) ? name : face + "_0";
         }
 
-        /// <summary>Bubble sprite to show, or null. The ">_" prompt on hover wins over Claude's state.</summary>
+        /// <summary>Bubble sprite to show, or null. The prompt on hover wins over the agent's state.</summary>
         string CurrentBubble()
         {
             if (dragging || sleeping)
                 return null;
-            string bubble = "bubble_" + (mirrored ? "l_" : "r_");
+            string bubble = "bubble_" + (LooksLeft ? "l_" : "r_");
             if (hovered && now - hoverSince >= BubbleDelayMs || now < hintUntil)
                 return bubble + ((now / 530) % 2 == 0 ? "on" : "off");
-            if (claude == ClaudeState.Waiting)
+            if (agent == AgentState.Waiting)
                 return bubble + "wait";
-            if (claude == ClaudeState.Working)
-                return bubble + "spin" + SpinFrames[(now / 110) % SpinFrames.Length];
+            if (agent == AgentState.Working)
+                return bubble + spinFrames[(now / 110) % spinFrames.Length];
             if (doneShownSince > 0)
                 return bubble + "done";
             return null;
@@ -404,7 +523,7 @@ namespace ClaudePet
         {
             Point tip = atlas.Anchor("bubble", mirrored);
             Size size = atlas.SpriteSize("bubble_r_on");
-            int left = mirrored ? PadX + tip.X - (size.Width - 1) : PadX + tip.X;
+            int left = LooksLeft ? PadX + tip.X - (size.Width - 1) : PadX + tip.X;
             return new Rectangle(left, PadTop + tip.Y - (size.Height - 1), size.Width, size.Height);
         }
 
@@ -454,26 +573,28 @@ namespace ClaudePet
         }
 
         /// <summary>
-        /// Art check without touching the desktop: renders idle, hover, sleep and click
-        /// (both facing directions) through the real drawing code into PNGs.
+        /// Art check without touching the desktop: renders idle, hover, sleep, click, working,
+        /// waiting and done (both looking directions) through the real drawing code into PNGs.
         /// </summary>
-        public static void Snapshot(string dir)
+        public static void Snapshot(PetInfo info, string dir)
         {
             Directory.CreateDirectory(dir);
-            using (var pet = new PetForm())
+            using (var pet = new PetForm(info, null))
             {
                 pet.scale = 3;
-                foreach (bool left in new[] { false, true })
+                foreach (bool mirror in new[] { false, true })
                 {
-                    string side = left ? "_left" : "_right";
-                    pet.mirrored = left;
-                    pet.SnapshotState(dir, "idle" + side, delegate { });
-                    pet.SnapshotState(dir, "hover" + side, delegate
+                    pet.mirrored = mirror;
+                    string side = pet.LooksLeft ? "_left" : "_right";
+                    string prefix = Path.Combine(dir, info.Id + "_");
+                    pet.SnapshotState(prefix + "idle" + side, delegate { });
+                    pet.SnapshotState(prefix + "hover" + side, delegate
                     {
                         pet.hovered = true;
                         pet.hoverSince = pet.now - 1000;
                     });
-                    pet.SnapshotState(dir, "sleep" + side, delegate
+                    pet.SnapshotState(prefix + "look" + side, delegate { pet.lookUntil = pet.now + 1000; });
+                    pet.SnapshotState(prefix + "sleep" + side, delegate
                     {
                         pet.sleeping = true;
                         for (int i = 0; i < 3; i++)
@@ -482,31 +603,34 @@ namespace ClaudePet
                             pet.now += 800;
                         }
                     });
-                    pet.SnapshotState(dir, "click" + side, delegate
+                    pet.SnapshotState(prefix + "click" + side, delegate
                     {
                         pet.bounceAt = pet.now;
+                        pet.happyUntil = pet.now + 1400;
                         pet.Burst();
                         pet.now += 260;
                     });
-                    pet.SnapshotState(dir, "working" + side, delegate
+                    pet.SnapshotState(prefix + "working" + side, delegate
                     {
-                        pet.claude = ClaudeState.Working;
-                        pet.now = 110 * 196;   // biggest spinner frame
+                        pet.agent = AgentState.Working;
+                        pet.now = 110 * 196 - 360;
+                        pet.SpawnTwinkle();
+                        pet.now = 110 * 196;   // biggest frame of the pulse spinner
                     });
-                    pet.SnapshotState(dir, "waiting" + side, delegate { pet.claude = ClaudeState.Waiting; });
-                    pet.SnapshotState(dir, "done" + side, delegate { pet.doneShownSince = 1; });
+                    pet.SnapshotState(prefix + "waiting" + side, delegate { pet.agent = AgentState.Waiting; });
+                    pet.SnapshotState(prefix + "done" + side, delegate { pet.doneShownSince = 1; });
                 }
             }
         }
 
-        void SnapshotState(string dir, string name, Action setup)
+        void SnapshotState(string path, Action setup)
         {
             now = 21200;   // bubble cursor phase: visible
             hovered = sleeping = false;
             bounceAt = -1;
-            happyUntil = blinkUntil = 0;
+            happyUntil = smileUntil = lookUntil = blinkUntil = 0;
             phase = 0;
-            claude = ClaudeState.Idle;
+            agent = AgentState.Idle;
             doneShownSince = 0;
             particles.Clear();
             setup();
@@ -516,7 +640,7 @@ namespace ClaudePet
                 g.Clear(Color.FromArgb(58, 74, 92));
                 PixelArtMode(g);
                 Compose(g, (mirrored ? "m_" : "") + FrameName(), CurrentBubble());
-                bmp.Save(Path.Combine(dir, name + ".png"));
+                bmp.Save(path + ".png");
             }
         }
 
@@ -539,9 +663,9 @@ namespace ClaudePet
                 double speed = 38 + rng.Next(22);
                 particles.Add(new Particle
                 {
-                    X = head.X, Y = head.Y - 16,   // above the hair, orange on orange disappears
+                    X = head.X, Y = head.Y - 16,   // above the hair, where the sparks stand out
                     VX = Math.Cos(angle) * speed, VY = Math.Sin(angle) * speed - 22,
-                    Gravity = 40, Born = now, Life = 620 + rng.Next(160), Frames = SparkFrames,
+                    Gravity = 40, Born = now, Life = 620 + rng.Next(160), Frames = burstFrames,
                 });
             }
         }
@@ -552,7 +676,7 @@ namespace ClaudePet
             particles.Add(new Particle
             {
                 X = logo.X, Y = logo.Y, VX = (rng.NextDouble() - 0.5) * 6, VY = -16,
-                Born = now, Life = 1100, Frames = SparkFrames,
+                Born = now, Life = 1100, Frames = twinkles[rng.Next(twinkles.Count)],
             });
         }
 
@@ -561,8 +685,8 @@ namespace ClaudePet
             Point z = CanvasAnchor("zzz");
             particles.Add(new Particle
             {
-                X = z.X, Y = z.Y, VX = mirrored ? -4 : 4, VY = -7,
-                Born = now, Life = 2600, Frames = ZFrames,
+                X = z.X, Y = z.Y, VX = LooksLeft ? -4 : 4, VY = -7,
+                Born = now, Life = 2600, Frames = zFrames,
             });
         }
 
@@ -592,12 +716,7 @@ namespace ClaudePet
                 sleeping = false;
             }
             if (dragging)
-            {
-                anchor = Clamp(new Point(pressAnchor.X + c.X - pressCursor.X, pressAnchor.Y + c.Y - pressCursor.Y), false);
-                mirrored = FacesLeft(anchor, mirrored);
-                Bounds = WindowRect();
-                Render(true);
-            }
+                MoveTo(new Point(pressAnchor.X + c.X - pressCursor.X, pressAnchor.Y + c.Y - pressCursor.Y), false);
         }
 
         protected override void OnMouseUp(MouseEventArgs e)
@@ -614,7 +733,7 @@ namespace ClaudePet
             if (dragging)
                 EndDrag();
             else
-                OpenClaudeCode();
+                OpenAgent();
         }
 
         protected override void OnMouseCaptureChanged(EventArgs e)
@@ -630,37 +749,36 @@ namespace ClaudePet
         void EndDrag()
         {
             dragging = false;
-            anchor = Clamp(anchor, true);
-            Bounds = WindowRect();
+            MoveTo(anchor, true);
             SavePosition();
-            Render(true);
         }
 
-        void OpenClaudeCode()
+        void OpenAgent()
         {
             now = clock.ElapsedMilliseconds;
             sleeping = false;
             AcknowledgeDone();
-            bounceAt = now;
+            if (canBounce)
+                bounceAt = now;
             happyUntil = now + 1400;
             Burst();
             Render(true);
             if (now - lastLaunch < 1500)
                 return;   // double clicks open one window, not two
             lastLaunch = now;
-            string dir = settings.WorkDir;
+            PetSettings s = PetSettings.From(pet, Store.Load());
             ThreadPool.QueueUserWorkItem(delegate
             {
                 try
                 {
-                    Launcher.Launch(dir);
+                    Launcher.Launch(pet, s);
                 }
                 catch (Exception ex)
                 {
                     Log.Write("launch failed: " + ex);
                     BeginInvoke((MethodInvoker)delegate
                     {
-                        MessageBox.Show(this, ex.Message, "Claude Pet", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        MessageBox.Show(this, ex.Message, pet.Name, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     });
                 }
             });
@@ -668,11 +786,12 @@ namespace ClaudePet
 
         void SavePosition()
         {
+            Store.Update(pet.Id, "x", PetSettings.Number(anchor.X), "y", PetSettings.Number(anchor.Y),
+                "scale", PetSettings.Number(scale));
+            settings.HasPosition = true;
             settings.X = anchor.X;
             settings.Y = anchor.Y;
-            settings.Scale = scale;
-            settings.HasPosition = true;
-            settings.Save();
+            settingsStamp = Store.Stamp();
         }
 
         // ------------------------------------------------------------------ menu
@@ -680,7 +799,7 @@ namespace ClaudePet
         ContextMenuStrip BuildMenu()
         {
             var strip = new ContextMenuStrip();
-            var open = new ToolStripMenuItem("Claude Code öffnen", null, delegate { OpenClaudeCode(); });
+            var open = new ToolStripMenuItem(pet.OpenText, null, delegate { OpenAgent(); });
             open.Font = new Font(open.Font, FontStyle.Bold);
             var folder = new ToolStripMenuItem("Ordner", null, delegate { ChooseFolder(); });
             var size = new ToolStripMenuItem("Größe");
@@ -695,31 +814,33 @@ namespace ClaudePet
             }
             var home = new ToolStripMenuItem("Zurück in die Ecke", null, delegate
             {
-                anchor = HomeAnchor();
-                mirrored = FacesLeft(anchor, false);
-                Bounds = WindowRect();
+                MoveTo(HomeAnchor(), true);
                 SavePosition();
-                Render(true);
             });
-            var autostart = new ToolStripMenuItem("Mit Windows starten", null, delegate
+            var hide = new ToolStripMenuItem("Ausblenden", null, delegate
             {
-                try { Autostart.Enabled = !Autostart.Enabled; }
-                catch (Exception ex) { Log.Write("autostart: " + ex.Message); }
+                if (!Ipc.SendToHost("hide " + pet.Id))
+                    Close();
             });
-            var quit = new ToolStripMenuItem("Beenden", null, delegate { Close(); });
+            var prefs = new ToolStripMenuItem("Einstellungen …", null, delegate { Ipc.SendToHost("settings " + pet.Id); });
+            var quit = new ToolStripMenuItem("aipets beenden", null, delegate
+            {
+                if (!Ipc.SendToHost("quit"))
+                    Close();
+            });
 
             strip.Items.AddRange(new ToolStripItem[]
             {
-                open, folder, new ToolStripSeparator(), size, home, autostart, new ToolStripSeparator(), quit,
+                open, folder, new ToolStripSeparator(), size, home, hide, new ToolStripSeparator(), prefs, quit,
             });
             strip.Opening += delegate
             {
-                folder.Text = "Ordner: " + ShortPath(settings.WorkDir) + " …";
-                folder.ToolTipText = settings.WorkDir;
+                string dir = PetSettings.From(pet, Store.Load()).WorkDir;
+                folder.Text = "Ordner: " + ShortPath(dir) + " …";
+                folder.ToolTipText = dir;
                 foreach (ToolStripMenuItem item in size.DropDownItems)
                     item.Checked = (int)item.Tag == scale;
-                try { autostart.Checked = Autostart.Enabled; }
-                catch (Exception) { autostart.Checked = false; }
+                prefs.Visible = host != null;
             };
             strip.Closed += delegate { menuOpen = false; };
             return strip;
@@ -735,17 +856,17 @@ namespace ClaudePet
         {
             using (var dialog = new FolderBrowserDialog())
             {
-                dialog.Description = "In welchem Ordner soll Claude Code starten?";
-                dialog.SelectedPath = settings.WorkDir;
+                dialog.Description = "In welchem Ordner soll " + pet.Name + " starten?";
+                dialog.SelectedPath = PetSettings.From(pet, Store.Load()).WorkDir;
                 if (dialog.ShowDialog(this) == DialogResult.OK && Directory.Exists(dialog.SelectedPath))
                 {
-                    settings.WorkDir = dialog.SelectedPath;
-                    SavePosition();
+                    Store.Update(pet.Id, "workdir", dialog.SelectedPath);
+                    settingsStamp = Store.Stamp();
                 }
             }
         }
 
-        static string ShortPath(string path)
+        public static string ShortPath(string path)
         {
             string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             if (path.StartsWith(home, StringComparison.OrdinalIgnoreCase))
