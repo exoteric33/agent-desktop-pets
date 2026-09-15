@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Threading;
 using System.Windows.Forms;
 
@@ -15,6 +17,8 @@ namespace AiPets
     /// aipets.exe --snapshot &lt;dir&gt; [--pet id]  render pets and settings window (that pet's page) into PNGs
     /// aipets.exe --status &lt;source&gt;        print the folded agent state (diagnostics)
     /// aipets.exe --command &lt;id&gt;           print what a click on the pet would start (diagnostics)
+    /// aipets.exe --install [--quiet]      autostart + status hooks of the installed agents, then start the tray
+    /// aipets.exe --uninstall [--quiet]    quit the tray, remove autostart and hooks
     /// --dry-run: clicks only log what they would start
     /// </summary>
     static class Program
@@ -61,6 +65,10 @@ namespace AiPets
 
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
+
+            bool install = Array.IndexOf(args, "--install") >= 0;
+            if (install || Array.IndexOf(args, "--uninstall") >= 0)
+                return RunSetup(install, Array.IndexOf(args, "--quiet") >= 0);
 
             string snapshot = Option(args, "--snapshot");
             if (snapshot != null)
@@ -142,6 +150,61 @@ namespace AiPets
                 Application.Run(new PetForm(pet, host));
                 return 0;
             }
+        }
+
+        /// <summary>install.cmd / uninstall.cmd: everything a user would otherwise set up by hand, with a summary at the end.</summary>
+        static int RunSetup(bool install, bool quiet)
+        {
+            Log.Tag = install ? "install" : "uninstall";
+            if (!install && !quiet && MessageBox.Show(
+                    "aipets entfernen?\n\nDas beendet aipets und entfernt „Mit Windows starten“ sowie die Status-Hooks aus Claude Code, Codex und Hermes.",
+                    App.Name, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+                return 1;
+            if (!install)
+                QuitTray();
+
+            List<Setup.Step> steps = install ? Setup.Install(App.ExePath) : Setup.Uninstall(App.ExePath);
+            if (install)
+            {
+                if (TrayRunning())
+                {
+                    steps.Add(new Setup.Step("aipets", true, "läuft"));
+                }
+                else
+                {
+                    // through explorer, so the tray does not inherit the installer's environment
+                    Process.Start("explorer.exe", "\"" + App.ExePath + "\"");
+                    steps.Add(new Setup.Step("aipets", true, "gestartet (Icon im Infobereich, Linksklick = Einstellungen)"));
+                }
+            }
+
+            bool ok = steps.TrueForAll(s => s.Ok || s.Text == "nicht installiert");
+            var text = new StringBuilder(install ? "aipets ist eingerichtet." : "aipets ist entfernt.");
+            text.Append(ok ? "\n\n" : " Nicht alles hat geklappt, siehe unten.\n\n");
+            foreach (Setup.Step step in steps)
+                text.Append(step).Append('\n');
+            if (!install)
+                text.Append("\nDen Ordner ").Append(App.Dir).Append(" kannst du jetzt löschen.");
+            Log.Write(text.ToString().Replace('\n', ' '));
+            Console.WriteLine(text);
+            if (!quiet)
+                MessageBox.Show(text.ToString(), App.Name, MessageBoxButtons.OK, ok ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+            return ok ? 0 : 1;
+        }
+
+        static bool TrayRunning()
+        {
+            bool created;
+            using (new Mutex(false, "Local\\aipets.tray", out created))
+                return !created;
+        }
+
+        static void QuitTray()
+        {
+            if (!TrayRunning() || !Ipc.SendToHost("quit"))
+                return;
+            for (int i = 0; i < 50 && TrayRunning(); i++)
+                Thread.Sleep(100);
         }
 
         static string Option(string[] args, string name)

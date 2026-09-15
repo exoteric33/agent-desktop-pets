@@ -26,6 +26,8 @@ $running | Stop-Process -Force
 $running | Wait-Process -Timeout 10 -ErrorAction SilentlyContinue
 
 $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+if (-not (Test-Path $csc)) { $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe' }   # 32-bit Windows
+if (-not (Test-Path $csc)) { throw 'C# compiler of .NET Framework 4 not found (Windows feature ".NET Framework 4.8")' }
 & $csc /nologo /target:winexe /optimize+ /codepage:65001 /utf8output `
     "/out:$exe" "/win32icon:$root\art\aipets.ico" "/resource:$root\art\aipets.ico,aipets.ico" `
     /reference:System.dll /reference:System.Drawing.dll /reference:System.Windows.Forms.dll `

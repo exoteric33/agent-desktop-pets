@@ -39,7 +39,9 @@ Der Einstieg für Agents (Arbeitsweise, Stand, lokale Einrichtung) steht in [AGE
 aipets\
 ├─ aipets.exe             Programm (Tray, Pets und Hook-Befehl in einer Datei; nicht im Repo, build.ps1 baut sie)
 ├─ build.ps1              baut die exe  (-Art = Icon und Sprites vorher neu, -Pet <id> = nur dieses Pet)
-├─ README.md              für den User: Schnellstart, Hooks eintragen
+├─ install.cmd            Doppelklick: build.ps1, dann aipets.exe --install (Autostart, Hooks + Freigaben, starten)
+├─ uninstall.cmd          Doppelklick: aipets.exe --uninstall (beenden, Autostart aus, Hooks raus)
+├─ README.md              für den User: Installieren, Bedienung, Hooks von Hand
 ├─ PET-BAUANLEITUNG.md    diese Datei: Technik, Art-Pipeline, Status-Protokoll, Stolperfallen
 ├─ AGENTS.md              Einstieg für Agents: Arbeitsweise, Stand, lokale Einrichtung
 ├─ CLAUDE.md              lädt AGENTS.md für Claude Code
@@ -57,9 +59,11 @@ aipets\
 │  ├─ gemini\             genauso (source.png)
 │  └─ grok\               genauso (source.png)
 └─ src\
-   ├─ Program.cs          Einstieg: Tray / --pet / --hook / --snapshot / --status / --command
+   ├─ Program.cs          Einstieg: Tray / --pet / --hook / --snapshot / --status / --command / --install / --uninstall
+   ├─ Setup.cs            Einrichten und Entfernen: Autostart, Hooks in Claude-/Codex-/Hermes-Configs, Freigaben
+   ├─ Json.cs             kleiner JSON-Leser/-Schreiber, der Schlüsselreihenfolge und Werte unverändert lässt
    ├─ TrayHost.cs         Tray-Icon, Menü, Pet-Prozesse starten und neu starten, Befehle der Pets
-   ├─ SettingsForm.cs     Einstellungsfenster (Seite pro Pet, „Klick öffnet: Programm / Website“)
+   ├─ SettingsForm.cs     Einstellungsfenster (Seite pro Pet, „Klick öffnet: Programm / Website“, „Hooks einrichten“)
    ├─ PetForm.cs          Pet-Fenster, Animation, Maus, Menü, Status-Anzeige
    ├─ Pets.cs             pet.ini lesen (PetInfo), wirksame Einstellungen (PetSettings, Mode/Website)
    ├─ Atlas.cs            atlas.png/atlas.txt laden, Frames und Sprites zeichnen
@@ -82,6 +86,12 @@ Laufzeitdaten liegen in `%APPDATA%\aipets\`:
 - **Voraussetzung Sprites:** Python mit `numpy` und `Pillow`.
 - `.\build.ps1` beendet ein laufendes aipets aus diesem Ordner, baut und startet es danach wieder (über `explorer.exe`, damit es nicht die Umgebung der Shell erbt).
   - `.\build.ps1 -Art -Pet grok` erzeugt vorher nur Groks Sprites neu.
+  - Auf 32-Bit-Windows nimmt es `Framework\…\csc.exe` statt `Framework64`.
+- **`install.cmd`:** `build.ps1` (mit `-ExecutionPolicy Bypass`), bei Fehler Meldung und `pause`, sonst `aipets.exe --install`.
+  - Das zeigt am Ende eine Zusammenfassung (✓ = erledigt oder war schon so, – = übersprungen oder fehlgeschlagen) und startet das Tray, falls es nicht läuft.
+  - Exit-Code 0, wenn alles geklappt hat oder ein Agent nur nicht installiert ist.
+  - `--quiet` lässt alle Fenster weg; die Zusammenfassung steht dann auf stdout und im Log (`[install]`).
+- **`uninstall.cmd`:** `aipets.exe --uninstall` fragt nach, beendet das Tray per IPC (`quit`), schaltet den Autostart aus und entfernt die Hooks. `%APPDATA%\aipets` bleibt.
 - **Testen, ohne den Desktop anzufassen:**
   - **Test-exe:** mit demselben `csc`-Aufruf wie in `build.ps1`, aber `/out:aipets-test.exe`, in den aipets-Ordner kompilieren (dann findet sie `pets\`). Das laufende aipets bleibt unberührt. Danach löschen.
   - `aipets.exe --snapshot <ordner> [--pet id]` rendert jedes Pet in allen Zuständen (idle, hover, look, sleep, click, working, waiting, done, beide Blickrichtungen) plus das Einstellungsfenster (mit `--pet` auf der Seite dieses Pets) als PNG.
@@ -90,6 +100,7 @@ Laufzeitdaten liegen in `%APPDATA%\aipets\`:
   - `--dry-run` (Tray oder Pet): Klicks protokollieren nur in `aipets.log`.
   - Das Programm ist eine GUI-exe. PowerShell wartet nicht darauf und liest ihre Ausgabe nur zuverlässig über `System.Diagnostics.Process` mit Umleitung (siehe Stolperfallen).
   - **Logik-Tests ohne Fenster:** alle `src\*.cs` plus eine eigene Testklasse mit `/target:exe /main:AiPets.<Klasse>` kompilieren (so wurden `Launcher.NormalizeUrl` und die Modus-Auswahl geprüft).
+  - **Setup-Tests:** nur gegen Kopien der Configs in einem Scratch-Ordner. Die Setup-Methoden nehmen Pfade (siehe Abschnitt 7, „Einrichten“). Die Codex-Freigabe mit `CODEX_HOME` auf einen leeren Ordner. Echte Dateien vorher und nachher per Hash vergleichen.
 
 ## 4. `pet.ini`
 
@@ -209,6 +220,9 @@ anim <name> <sprite> <sprite> …           # optional: burst, twinkle*, z, spin
 - **Einstellungsfenster:** 700×504, eine Seite pro Pet.
   - Zeilen: Größe, Klick öffnet, dann Programm-Zeilen (`programRows`) oder Website-Zeilen (`linkRows`), Statusanzeige, Buttons.
   - Jede Änderung wird sofort gespeichert (`TrayHost.ChangeSetting` → `settings.ini` → Nachricht an das Pet).
+  - **Statusanzeige:** `HookText` sucht in der Config des Agents nach dem Pfad dieser exe, so geschrieben, wie er dort steht (JSON: `\\`; YAML/PowerShell: `''`).
+    - Texte: „✓ Hooks eingerichtet“, „Keine Hooks in …“ oder „Hooks rufen eine andere aipets.exe auf“.
+    - Bei den letzten beiden erscheint der Link „Hooks einrichten“ (`Setup.Hooks(quelle, App.ExePath, true)`, Ergebnis als Meldung).
 - **Rechtsklick-Menü des Pets:** öffnen, Ordner (nur im Programm-Modus), Klick öffnet → Programm/Website, Größe, zurück in die Ecke, ausblenden, Einstellungen, beenden.
 - **Tray ⇄ Pet:**
   - Pets heißen `aipets.pet.<id>` (Fenstertitel), das Tray-Fenster `aipets.host`.
@@ -253,7 +267,7 @@ anim <name> <sprite> <sprite> …           # optional: burst, twinkle*, z, spin
 
 - **Aufruf:** Hermes ruft Shell-Hooks synchron aus dem Agent-Prozess auf. Die Eltern-PID des Hooks ist deshalb der Hermes-Prozess.
 - **Subagents:** öffnen eigene Turns im selben Prozess. Deshalb zählt die Datei offene Turns, und ein Named Mutex `Local\aipets.status.hermes-<pid>` serialisiert parallele Hooks.
-- **Freigaben:** Hermes verlangt pro (Event, Befehl) eine einmalige Freigabe (`shell-hooks-allowlist.json`, `hermes hooks list`).
+- **Freigaben:** Hermes verlangt pro (Event, Befehl) eine einmalige Freigabe (`shell-hooks-allowlist.json`, `hermes hooks list`). Setup trägt sie selbst ein (siehe „Einrichten“ unten).
 - **Stale-Timeout:** 2 h, nur für verlorene Hooks. Das Ende eines Turns meldet Hermes immer, auch bei Abbruch.
 
 **Codex** (`quelle=codex`, `hooks.json` im Codex-Home, eine Datei pro `session_id` wie bei Claude, Extra = `transcript_path`, bei Codex meist `null`):
@@ -275,7 +289,7 @@ anim <name> <sprite> <sprite> …           # optional: burst, twinkle*, z, spin
   - Läuft ein einzelner Befehl länger, holt das nächste `resume` den Spinner zurück.
 - **Freigaben:** Codex führt Hooks erst nach einer Freigabe aus (`/hooks`).
   - Gespeichert wird sie als `[hooks.state.'<pfad>\hooks.json:<event>:0:0'] trusted_hash` in `config.toml`. Der Hash hängt am Befehl: Liegt die exe woanders, sind neue Freigaben nötig.
-  - Ohne TUI geht es über `codex app-server` (JSON-RPC über stdio), genau wie `/hooks`: `initialize`, `initialized`, dann `hooks/list` (`cwds`) für `key` und `currentHash`, dann `config/batchWrite` mit `keyPath: "hooks.state"`, `value: {key: {trusted_hash}}`, `mergeStrategy: "upsert"`.
+  - Ohne TUI geht es über `codex app-server` (JSON-RPC über stdio), genau wie `/hooks`: `initialize`, `initialized`, dann `hooks/list` (`cwds`) für `key` und `currentHash`, dann `config/batchWrite` mit `keyPath: "hooks.state"`, `value: {key: {trusted_hash}}`, `mergeStrategy: "upsert"`. So macht es Setup (`TrustCodexHooks`).
 - **Stale-Timeout:** 15 min seit dem letzten Hook.
 
 **Pet** (`StatusMonitor`, alle 500 ms):
@@ -283,7 +297,34 @@ anim <name> <sprite> <sprite> …           # optional: burst, twinkle*, z, spin
 - Waiting schlägt Working schlägt Idle; der neueste Done-Zeitstempel zeigt den Haken.
 - Der Haken bleibt, bis du ein paar Sekunden wieder am PC warst.
 
-**Für eine andere Quelle:** eine neue `case` in `HookCommand.Run` und `status=<quelle>` in der pet.ini. Das Dateiformat ist bewusst simpel, notfalls schreibt ein Skript die Dateien direkt. Gemini und Grok (Websites) haben keine Statusquelle.
+**Für eine andere Quelle:** eine neue `case` in `HookCommand.Run`, `status=<quelle>` in der pet.ini und ein Zweig in `Setup.Hooks` (sonst trägt `install.cmd` die Hooks nicht ein) plus in `SettingsForm.HookText`. Das Dateiformat ist bewusst simpel, notfalls schreibt ein Skript die Dateien direkt. Gemini und Grok (Websites) haben keine Statusquelle.
+
+**Einrichten** (`src/Setup.cs`, aufgerufen von `--install`, `--uninstall` und „Hooks einrichten“):
+- **Ablauf:** Autostart an bzw. aus, dann `Setup.Hooks(quelle, exe, install)` für `claude`, `codex` und `hermes`.
+  - Jeder Schritt liefert einen `Step` (Name, ok, Text). Ausnahmen werden zum Text des Schritts und landen im Log.
+- **Welche Agents:** nur die, deren Home existiert, sonst „nicht installiert“ (es wird nichts angelegt).
+  - Claude: `~\.claude`.
+  - Codex: `CODEX_HOME`, sonst `~\.codex`.
+  - Hermes: `HERMES_HOME`, sonst `%LOCALAPPDATA%\hermes` (falls vorhanden), sonst `~\.hermes`. Fehlt dort die `config.yaml`, heißt es „Hermes einmal starten“.
+- **Nur eigene Einträge:** Ein Handler gehört aipets, wenn der Befehl `aipets.exe` und `--hook <quelle>` enthält (Codex, Hermes) bzw. `args` mit `--hook`, `<quelle>` beginnt (Claude).
+  - Einträge eines alten Pfads werden an derselben Stelle ersetzt, fremde Hooks bleiben, wo sie sind.
+  - Beim Entfernen verschwinden leer gewordene Gruppen, Events und Blöcke.
+- **Schreiben:** nur bei einer echten Änderung, vorher `<datei>.bak-aipets` mit dem alten Inhalt, UTF-8 ohne BOM.
+  - JSON bleibt bei CRLF, wenn die Datei CRLF hatte. In YAML behält jede Zeile ihr eigenes Zeilenende.
+- **JSON** (`src/Json.cs`): `JsonObject` (Schlüssel in Originalreihenfolge), `List<object>` und `JsonValue` (Rohtext). Zahlen, Escapes und fremde Einträge bleiben so, wie sie waren. Geschrieben wird mit 2 Leerzeichen Einrückung. Eine neue Codex-`hooks.json` bekommt eine `description`.
+- **Hermes-`config.yaml`:** zeilenweise, ohne YAML-Bibliothek.
+  - **Entfernen:** Sucht den Block `hooks:` auf oberster Ebene und entfernt `- command: …aipets.exe… --hook hermes`-Einträge samt tieferer Zeilen, aber nie über das nächste `-` hinaus.
+  - **Einfügen:** direkt unter dem vorhandenen Event-Schlüssel (ein `[]` fällt weg) oder als neuer Schlüssel am Blockende. Die Einrückung kommt von den vorhandenen Einträgen, auch `- ` auf Höhe des Schlüssels (PyYAML-Stil). Ohne Block kommen Kommentar `# aipets: …` und Block ans Dateiende.
+  - **Schon aktuell:** Stehen genau die Einträge dieser exe drin, bleibt die Datei unberührt (`HermesUpToDate`), auch wenn fremde Hooks davor stehen.
+  - **Aufräumen beim Entfernen:** Eigene leere Event-Schlüssel gehen weg, ein leerer Block samt Kommentar und Leerzeile auch. Ein vorher leeres `pre_llm_call: []` kommt nicht zurück; für Hermes ist das gleichwertig.
+  - Geprüft mit PyYAML aus Hermes' venv: eingerückt (2/4), breit (4/8), PyYAML-Stil, CRLF ohne Zeilenende am Schluss, jeweils nach Installieren, Umzug der exe und Entfernen.
+- **Hermes-Freigabe:** `shell-hooks-allowlist.json` → `approvals: [{event, command, approved_at, script_mtime_at_approval}]`. Hermes vergleicht nur Event und Befehl. Setup ergänzt fehlende Einträge, lässt passende stehen und löscht veraltete aipets-Einträge.
+- **Codex-Freigabe:** `TrustCodexHooks` startet `codex app-server` (bei npm über `cmd /c`, weil es eine `.cmd` ist), Ablauf wie oben.
+  - Es zählt die gelisteten aipets-Hooks aus genau dieser `hooks.json`. Bei 0 kommt eine Fehlermeldung statt „freigegeben“.
+  - Timeout 30 s pro Antwort. Schließt der App-Server stdout, gibt Setup sofort auf. Bei Fehlern kommt stderr ins Log.
+  - Ohne `codex` (PATH oder `%APPDATA%\npm\codex.cmd`) werden die Hooks eingetragen, dazu ein Hinweis auf `/hooks`.
+  - `--uninstall` lässt `[hooks.state]` in `config.toml` stehen.
+- **Tray:** `--install` startet es über `explorer.exe`, falls es nicht läuft. `--uninstall` beendet es per IPC (`quit`) und wartet bis zu 5 s.
 
 ## 8. Neues Pet – Checkliste
 
@@ -300,7 +341,7 @@ anim <name> <sprite> <sprite> …           # optional: burst, twinkle*, z, spin
 4. `pet.ini` schreiben: `mode`, `program`/`find`/`args`/`shell` und `url` (beides, damit man umschalten kann), `status`, `home` ≠ andere Pets.
 5. `.\build.ps1 -Art -Pet <id>` (oder erst eine Test-exe), dann `aipets.exe --snapshot <ordner> --pet <id>` und die PNGs anschauen (alle Zustände plus Einstellungsseite).
 6. `aipets.exe --command <id>` prüfen. Einmal echt klicken, wenn der Befehl stimmt.
-7. Für den Status die Hooks des Agents eintragen und mit `--status <quelle>` prüfen.
+7. Für den Status: Bei einer neuen Quelle `HookCommand.Run`, `Setup.Hooks` und `HookText` erweitern (Abschnitt 7). Dann „Hooks einrichten“ in den Einstellungen und mit `--status <quelle>` prüfen.
 8. README-Tabelle, diese Datei (Tabelle in 1, Art-Notizen in 5) und `AGENTS.md` (Stand) nachziehen.
 
 ## 9. Stolperfallen (alle schon einmal passiert)
@@ -316,6 +357,13 @@ anim <name> <sprite> <sprite> …           # optional: burst, twinkle*, z, spin
   - Die IDs stehen vor dem Nutzertext; die Regex nimmt jeweils den ersten Treffer.
 - **YAML:** Windows-Pfade in `config.yaml` nur in einfachen Anführungszeichen. In doppelten ist `\U…` ein Escape.
 - **Codex-Hooks laufen in Windows PowerShell 5.1**, nicht direkt: GUI-exe nur mit `| Out-Null` aufrufen (siehe Abschnitt 7). Ein Exit-Code aus einem inneren Aufruf kommt nur mit `; exit $LASTEXITCODE` bei Codex an.
+- **UTF-8-BOM vor der ersten Nachricht an `codex app-server`:** .NET Framework legt `Process.StandardInput` mit `Console.InputEncoding` an und schreibt dessen Präambel sofort (AutoFlush).
+  - Bei Codepage 65001 ist das ein BOM. Der App-Server meldet „Failed to deserialize JSONRPCMessage“ und antwortet nie.
+  - Das passiert in Konsolen mit UTF-8 (so fiel es im Test auf). Laut .NET-Quelltext passiert es auch in GUI-Prozessen, wenn Windows' Option „Unicode UTF-8 für weltweite Sprachunterstützung“ an ist.
+  - Setup schickt deshalb in dem Fall zuerst eine Leerzeile und schreibt die Nachrichten als Bytes direkt in `BaseStream`.
+- **Hermes-`config.yaml` mit gemischten Zeilenenden** (beim User CRLF und LF gemischt, ohne Zeilenende am Schluss): Zeilenenden nie vereinheitlichen, sonst ist jede Installation eine „Änderung“.
+- **Fremde YAML-Einrückung:** nie feste 2/4 annehmen. Beim Entfernen an der nächsten `-`-Zeile aufhören, sonst verschwindet ein fremder Eintrag mit.
+- **Codex-Test mit `CODEX_HOME` im Temp-Ordner:** Die Warnungen „Refusing to create helper binaries under temporary dir“ und „Project-local config … disabled“ sind harmlos. Die zweite kommt, weil `~\.codex` dann als Projektordner gilt.
 - **Codex zum Testen ohne Spuren:** `codex exec --ephemeral --ignore-user-config --dangerously-bypass-hook-trust -c "hooks.<Event>=[{hooks=[{type=…,command=…}]}]"`. Ein zusätzlicher UserPromptSubmit-Hook mit `Start-Sleep -Seconds 4; [Console]::Error.WriteLine(1); exit 2` blockt den Prompt, dann gibt es keinen Modellaufruf.
 - **Link öffnen:** `ProcessStartInfo` mit `UseShellExecute = true` darf nie `EnvironmentVariables` anfassen, auch nicht lesend fürs Log. Schon das Anlegen des Dictionarys lässt `Process.Start` werfen. `Process.Start` gibt `null` zurück, wenn der Browser schon läuft.
 - **RadioButtons in WinForms** bilden pro Container eine Gruppe. „Klick öffnet“ steht deshalb in einem eigenen `Panel`, sonst schaltet „Website“ die Größen-Buttons ab.
@@ -328,6 +376,8 @@ anim <name> <sprite> <sprite> …           # optional: burst, twinkle*, z, spin
   - `aipets.exe` ist eine GUI-exe. `$json | & aipets.exe --hook …` wartet nicht, die Ergebnisse kommen versetzt.
   - Deshalb `System.Diagnostics.Process` mit umgeleitetem stdin/stdout und `WaitForExit`.
   - `Add-Type`-Typen und Funktionen leben nur in einem Aufruf. `H` ist in PowerShell ein Alias (`Get-History`), eigene Funktionen nicht so nennen.
+  - `-match` ignoriert Groß- und Kleinschreibung: `'failures: 0' -match '^FAIL'` ist wahr. Testausgaben mit `-cmatch` auswerten.
+  - Umgeleitete Ausgabe der GUI-exe zeigt ✓ und Umlaute als `?`. Das liegt nur an der Konsolen-Codepage; Log und Meldungsfenster sind richtig.
 - **Premultiplied Alpha:** Für `UpdateLayeredWindow` in ein `Format32bppPArgb`-Bitmap über dem DIB zeichnen, nicht `GetHbitmap()` pro Frame.
 - **`DrawImageUnscaled`** skaliert nach der DPI des PNG. Immer mit expliziten Pixel-Rechtecken zeichnen.
 - **Testen, ohne den User zu stören:** nicht seine Maus bewegen. `--snapshot`, `--command`, `--status`, `--dry-run` genügen. Screenshots nur lesend per BitBlt.

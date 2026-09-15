@@ -4,7 +4,7 @@ Diese Datei ist der Übergabepunkt: Wer hier weiterarbeitet, liest sie zuerst. S
 
 | Datei | Für wen | Inhalt |
 |---|---|---|
-| [README.md](README.md) | User | Schnellstart, Einstellungen, Hooks eintragen |
+| [README.md](README.md) | User | Installieren (`install.cmd`), Bedienung, Hooks von Hand |
 | [PET-BAUANLEITUNG.md](PET-BAUANLEITUNG.md) | Agents und Entwickler | Aufbau, Art-Pipeline, Status-Protokoll, Checkliste neues Pet, Stolperfallen |
 | AGENTS.md | Agents | Stand, Arbeitsweise, Befehle, lokale Einrichtung, offene Punkte |
 | [CLAUDE.md](CLAUDE.md) | Claude Code | lädt diese Datei |
@@ -16,6 +16,7 @@ Pixel-Art-Desktop-Pets für Windows, eins pro KI-Agent. Ein Tray-Programm (`aipe
 - **Klick:** öffnet je nach Modus das Programm im Windows Terminal oder die Website im Standardbrowser. Umschaltbar pro Pet in den Einstellungen („Klick öffnet“) und im Rechtsklick-Menü.
 - **Status:** Hooks des Agents melden, ob er arbeitet (Spinner), auf den User wartet („?“) oder fertig ist (✓).
 - **Technik:** C# 5 / WinForms (.NET Framework 4, `csc` aus Windows), Sprites per Python (`numpy`, `Pillow`).
+- **Installation:** `install.cmd` baut, schaltet den Autostart ein, trägt die Hooks aller installierten Agents ein, gibt sie frei und startet aipets. `uninstall.cmd` macht das rückgängig. Beide rufen `aipets.exe --install` bzw. `--uninstall` auf, der Code steht in `src/Setup.cs`.
 
 ## 2. Stand (2026-09-15)
 
@@ -27,9 +28,19 @@ Pixel-Art-Desktop-Pets für Windows, eins pro KI-Agent. Ein Tray-Programm (`aipe
 | `gemini` | Gemini | ins Chat eingefügtes Bild (nur im Repo) | Website gemini.google.com/app | `gemini` (CLI nicht installiert) | – | Google-„G“ statt „3.8 Flash“, gezeichnete Augen, winkt |
 | `grok` | Grok | `Desktop\grok-chan-pixel-ohne-tablet.png` | Website grok.com | `grok` (CLI nicht installiert) | – | xAI-Logo statt „grok“ (User-Wahl), zwinkert beim Hover wie im Bild, Peace-Zeichen wippt |
 
-Commits auf `main`: ClaudePet → aipets (Tray, Hermes) → Astra/Codex-Hooks → Gemini/Link-Pets → Grok und Programm/Website-Auswahl für alle → neues Grok-Aussehen.
+Commits auf `main`: ClaudePet → aipets (Tray, Hermes) → Astra/Codex-Hooks → Gemini/Link-Pets → Grok und Programm/Website-Auswahl für alle → neues Grok-Aussehen → Ein-Klick-Installation.
 
 Grok hatte zuerst eine andere Vorlage (`Desktop\grok-chan.png`: Brille, Tablet, Uhr). Der User hat danach nur das Aussehen durch `grok-chan-pixel-ohne-tablet.png` ersetzen lassen; alles andere (Link, Logo-Wahl, Effekte) blieb.
+
+**Installation leichter gemacht** (Wunsch des Users):
+- **Neu:** `install.cmd`, `uninstall.cmd`, `aipets.exe --install/--uninstall [--quiet]`, `src/Setup.cs` und `src/Json.cs`. In den Einstellungen steht unter „Statusanzeige“ der Link „Hooks einrichten“, sobald die Hooks fehlen oder eine andere exe aufrufen.
+- **Getestet:**
+  - Testklasse gegen Kopien der echten Configs des Users (41 Prüfungen: No-op, Umzug der exe, Entfernen, frische Dateien, fremde YAML-Einrückung, PyYAML-Stil, fremde Hooks vor unseren, CRLF ohne Zeilenende am Schluss, gemischte Zeilenenden).
+  - Die YAML-Ergebnisse mit PyYAML aus Hermes' venv geparst.
+  - Codex-Freigabe gegen ein leeres `CODEX_HOME`.
+  - `install.cmd` als `--quiet`-Kopie.
+  - Auf dem Rechner des Users war `--install` ein No-op (Hashes gleich), weil schon alles eingerichtet war.
+- **Nicht getestet:** Doppelklick mit Fenstern und `--uninstall` auf dem echten Rechner (würde seine Hooks entfernen).
 
 ## 3. Befehle
 
@@ -48,10 +59,19 @@ python pets\grok\art\make_sprites.py  # nur Sprites, ohne Neustart
 aipets-test.exe --snapshot <ordner> --pet grok   # alle Zustände + Einstellungsseite als PNG
 aipets-test.exe --command grok                   # was ein Klick öffnen würde
 aipets-test.exe --status codex                   # zusammengefasster Agent-Status
+
+# einrichten / entfernen (= install.cmd / uninstall.cmd ohne Bauen; --quiet = ohne Fenster, Zusammenfassung auf stdout und im Log)
+aipets.exe --install --quiet
+aipets.exe --uninstall --quiet                   # NIE auf dem Rechner des Users: entfernt seine Hooks
 ```
 
 - **Logik testen:** alle `src\*.cs` plus eine Testklasse mit `/target:exe /main:AiPets.<Klasse>` kompilieren und laufen lassen.
 - **Hooks testen:** Payload per `System.Diagnostics.Process` auf stdin von `aipets.exe --hook <quelle> <event>` geben. Details in PET-BAUANLEITUNG, Abschnitt 7 und 9.
+- **Setup testen:** nie gegen die echten Dateien.
+  - `Setup.Claude(pfad, exe, install)`, `Setup.Codex(home, exe, install, trust)`, `Setup.EditHermesConfig(pfad, exe, install)` und `Setup.EditHermesAllowlist(pfad, exe, install)` nehmen Pfade. Kopien der echten Configs in einen Scratch-Ordner legen und eine Testklasse dagegen laufen lassen.
+  - Die Codex-Freigabe (`trust = true`) mit `CODEX_HOME` auf einen leeren Scratch-Ordner testen: Setup startet `codex app-server` mit dieser Umgebung.
+  - Vorher und nachher Hashes der echten Dateien vergleichen.
+- **Claude Code auf diesem Rechner:** Das PowerShell-Tool blockt `Remove-Item` in einem Aufruf, der auch csc-Argumente wie `/nologo` enthält (hält sie für Systempfade). Dateien dann per Bash löschen und getrennt kompilieren.
 
 ## 4. Arbeitsweise (so will es der User)
 
@@ -78,12 +98,17 @@ aipets-test.exe --status codex                   # zusammengefasster Agent-Statu
 - **Claude Code:** Hooks in `%USERPROFILE%\.claude\settings.json` (Form mit `args`, siehe README).
 - **Hermes Agent:** nativ in `%LOCALAPPDATA%\hermes` (= `HERMES_HOME`), nur Windows PowerShell 5.1.
   - Hooks in `config.yaml` (Pfade in einfachen Anführungszeichen).
-  - Die Freigabe wurde vorab mit Hermes' eigener Funktion gesetzt, im Ordner `hermes-agent`: `venv\Scripts\python.exe -c "from hermes_cli.config import load_config; from agent.shell_hooks import register_from_config; register_from_config(load_config(), accept_hooks=True)"`.
-  - Die Allowlist gilt pro Befehlstext. Ein laufender Hermes-Gateway lädt geänderte Hooks erst nach Neustart.
+  - Freigaben stehen in `shell-hooks-allowlist.json`. `aipets.exe --install` trägt sie selbst ein.
+  - Beim ersten Mal wurden sie mit Hermes' eigener Funktion gesetzt, im Ordner `hermes-agent`: `venv\Scripts\python.exe -c "from hermes_cli.config import load_config; from agent.shell_hooks import register_from_config; register_from_config(load_config(), accept_hooks=True)"`.
+  - Die Allowlist gilt pro Event und Befehlstext. Ein laufender Hermes-Gateway lädt geänderte Hooks erst nach Neustart.
+  - Die `config.yaml` hat gemischte Zeilenenden (CRLF und LF) und keinen Zeilenumbruch am Schluss. Setup lässt das so.
 - **Codex:** CLI 0.154 per npm (`%APPDATA%\npm\codex.cmd`), Home `%USERPROFILE%\.codex`. Die Codex-Desktop-App teilt dieses Home und hat ein eigenes Astra-Maskottchen (`.codex\pets\astra-6`, nicht von aipets).
-  - Hooks in `.codex\hooks.json`. Freigegeben über `codex app-server` (`hooks/list` → `config/batchWrite`), deshalb stehen in `.codex\config.toml` Einträge unter `[hooks.state]`.
+  - Hooks in `.codex\hooks.json`. `aipets.exe --install` gibt sie über `codex app-server` frei (`hooks/list` → `config/batchWrite`). Deshalb stehen in `.codex\config.toml` Einträge unter `[hooks.state]`.
 - **Gemini CLI / Grok CLI:** nicht installiert. Gemini und Grok laufen im Website-Modus.
-- **Verschiebt jemand die exe:** Claude-Hooks, Hermes-Hooks plus Allowlist und Codex-Hooks plus Freigaben müssen neu, weil alle den Pfad enthalten. Die Einstellungsseite zeigt unter „Statusanzeige“, ob die Hooks die aktuelle exe aufrufen.
+- **Verschiebt jemand die exe:** Claude-Hooks, Hermes-Hooks plus Allowlist, Codex-Hooks plus Freigaben und der Autostart müssen neu, weil alle den Pfad enthalten.
+  - `install.cmd` im neuen Ordner erledigt alles. „Hooks einrichten“ in den Einstellungen erledigt es pro Agent.
+  - Setup erkennt die alten Einträge an `aipets.exe` + `--hook <quelle>` und ersetzt sie an derselben Stelle.
+  - Die Einstellungsseite zeigt unter „Statusanzeige“, ob die Hooks die aktuelle exe aufrufen („Hooks rufen eine andere aipets.exe auf“).
 
 ## 6. Offene Punkte und Ideen
 
@@ -92,3 +117,8 @@ aipets-test.exe --status codex                   # zusammengefasster Agent-Statu
 - `src/Settings.cs` ist ungenutzte Altlast aus ClaudePet (Namespace `ClaudePet`) und könnte gelöscht werden.
 - Home-Positionen sind in Sprite-Pixeln angegeben. Bei gemischten Größen (der User nutzt 2× und 3×) überlappen „Zurück in die Ecke“-Plätze.
 - Die Grok-CLI-Vorgabe `program=grok` / `%APPDATA%\npm\grok.cmd` ist eine Annahme. Bei einer echten Installation Pfad und Argumente prüfen.
+- **Setup:**
+  - Wer nur die Codex-Desktop-App hat (ohne CLI), bekommt die Hooks, aber keine automatische Freigabe („codex nicht gefunden“).
+    - Die App bringt eine eigene `codex.exe` mit (`%LOCALAPPDATA%\OpenAI\Codex\bin\<hash>\`). Die könnte als Fallback für `app-server` dienen; ungetestet.
+  - `--uninstall` lässt die Codex-Freigaben (`[hooks.state.…]` in `config.toml`) stehen. Das schadet nicht: Bei einer Neuinstallation am selben Ort passen Schlüssel und Hash wieder.
+  - Die Gemini CLI und die Grok CLI kennt Setup nicht (keine Statusquelle).

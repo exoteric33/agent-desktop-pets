@@ -26,6 +26,7 @@ namespace AiPets
         readonly ListBox list = new ListBox();
         readonly PixelBox avatar = new PixelBox();
         readonly Label title = new Label(), state = new Label(), hooks = new Label();
+        readonly LinkLabel setupLink = new LinkLabel();
         readonly CheckBox showBox = new CheckBox(), autostartBox = new CheckBox();
         readonly RadioButton[] sizes = new RadioButton[4];
         readonly RadioButton programMode = new RadioButton(), websiteMode = new RadioButton();
@@ -252,8 +253,30 @@ namespace AiPets
             y += 38;
             AddLabel(page, "Statusanzeige", y);
             hooks.Location = new Point(140, y);
-            hooks.Size = new Size(330, 34);
+            hooks.Size = new Size(330, 18);
             page.Controls.Add(hooks);
+            setupLink.Text = "Hooks einrichten";
+            setupLink.AutoSize = true;
+            setupLink.Location = new Point(139, y + 19);
+            setupLink.LinkColor = Accent;
+            setupLink.LinkClicked += delegate
+            {
+                if (current == null)
+                    return;
+                Setup.Step step;
+                Cursor = Cursors.WaitCursor;
+                try
+                {
+                    step = Setup.Hooks(current.Info.Status, App.ExePath, true);
+                }
+                finally
+                {
+                    Cursor = Cursors.Default;
+                }
+                MessageBox.Show(this, step.ToString(), Text, MessageBoxButtons.OK, step.Ok ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+                ShowPet(current);
+            };
+            page.Controls.Add(setupLink);
 
             y += 44;
             openButton.Location = new Point(140, y);
@@ -392,6 +415,7 @@ namespace AiPets
                 bool ok;
                 hooks.Text = HookText(p.Info, out ok);
                 hooks.ForeColor = ok ? Good : Muted;
+                setupLink.Visible = !ok && p.Info.Status.Length > 0;
             }
             finally
             {
@@ -496,58 +520,43 @@ namespace AiPets
         static string HookText(PetInfo pet, out bool ok)
         {
             ok = false;
-            string file, marker;
+            string file, marker;   // the exe path as it is written in that file
             if (pet.Status == "claude")
             {
-                file = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), @".claude\settings.json");
+                file = Setup.ClaudeSettings;
                 marker = App.ExePath.Replace("\\", "\\\\");
             }
             else if (pet.Status == "hermes")
             {
-                file = HermesConfig();
-                marker = App.ExePath;
+                file = Path.Combine(Setup.HermesHome, "config.yaml");
+                marker = App.ExePath.Replace("'", "''");
             }
             else if (pet.Status == "codex")
             {
-                file = Path.Combine(CodexHome(), "hooks.json");
-                marker = App.ExePath.Replace("\\", "\\\\");
+                file = Path.Combine(Setup.CodexHome, "hooks.json");
+                marker = App.ExePath.Replace("'", "''").Replace("\\", "\\\\");
             }
             else
             {
                 return "–";
             }
+            bool other = false;   // aipets hooks, but for an exe somewhere else (folder moved or renamed)
             try
             {
                 if (File.Exists(file))
                 {
                     string text = File.ReadAllText(file);
-                    ok = text.IndexOf(marker, StringComparison.OrdinalIgnoreCase) >= 0 && text.IndexOf("--hook", StringComparison.Ordinal) >= 0;
+                    bool hooked = text.IndexOf("--hook", StringComparison.Ordinal) >= 0 && text.IndexOf("aipets", StringComparison.OrdinalIgnoreCase) >= 0;
+                    ok = hooked && text.IndexOf(marker, StringComparison.OrdinalIgnoreCase) >= 0;
+                    other = hooked && !ok;
                 }
             }
             catch (IOException) { }
             catch (UnauthorizedAccessException) { }
             string where = PetForm.ShortPath(file);
-            return ok ? "✓ Hooks eingerichtet (" + where + ")" : "Keine Hooks in " + where + " – siehe README";
-        }
-
-        public static string HermesConfig()
-        {
-            string home = Environment.GetEnvironmentVariable("HERMES_HOME");
-            if (string.IsNullOrEmpty(home))
-            {
-                home = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "hermes");
-                if (!Directory.Exists(home))
-                    home = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".hermes");
-            }
-            return Path.Combine(home, "config.yaml");
-        }
-
-        static string CodexHome()
-        {
-            string home = Environment.GetEnvironmentVariable("CODEX_HOME");
-            return string.IsNullOrEmpty(home)
-                ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".codex")
-                : home;
+            if (ok)
+                return "✓ Hooks eingerichtet (" + where + ")";
+            return other ? "Hooks rufen eine andere aipets.exe auf" : "Keine Hooks in " + where;
         }
 
         bool snapshot;

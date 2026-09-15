@@ -12,16 +12,24 @@ Pixel-Art-Desktop-Pets für Windows, eins pro KI-Agent. Die Pets sitzen auf der 
 
 ## Schnellstart
 
-1. **Bauen:** `.\build.ps1` erzeugt `aipets.exe` mit dem C#-Compiler, der in Windows eingebaut ist. Installieren musst du nichts.
-   `.\build.ps1 -Art` erzeugt vorher App-Icon und Sprites neu. Dafür brauchst du Python mit `numpy` und `Pillow`.
-2. **Starten:** `aipets.exe` doppelklicken. Die exe muss neben dem Ordner `pets\` liegen.
-   Im Infobereich der Taskleiste (bei den ausgeblendeten Symbolen hinter `^`) erscheint das aipets-Icon:
+1. **Installieren:** Den Ordner dorthin legen, wo er bleiben soll (klonen oder ZIP entpacken), und **`install.cmd` doppelklicken.** Autostart und Hooks merken sich den Pfad.
+   - Baut `aipets.exe` mit dem C#-Compiler, der in Windows eingebaut ist. Installieren musst du nichts.
+   - Schaltet „Mit Windows starten“ ein.
+   - Trägt die Status-Hooks für Claude Code, Codex und Hermes Agent ein, soweit sie installiert sind, und gibt sie gleich frei. In Codex musst du nichts unter `/hooks` bestätigen und in Hermes nichts erlauben.
+   - Startet aipets und zeigt am Ende, was es gemacht hat.
+
+   Mehrmals ausführen schadet nicht: Was schon stimmt, bleibt unverändert. Von jeder geänderten Datei liegt die vorige Fassung als `<datei>.bak-aipets` daneben. Agents, die gerade laufen, einmal neu starten, damit sie die Hooks laden.
+2. **Bedienen:** Im Infobereich der Taskleiste (bei den ausgeblendeten Symbolen hinter `^`) erscheint das aipets-Icon.
    - **Linksklick:** Einstellungen. Dort kannst du Pets ein- und ausblenden, die Größe wählen und unter **„Klick öffnet“** zwischen **Programm** und **Website** umschalten.
      - Programm: Programm, Argumente, Terminal und Arbeitsordner.
      - Website: der Link (nur http/https; `grok.com` wird automatisch zu `https://grok.com/`).
-     - Unten schaltest du „Mit Windows starten“ ein.
+     - Unten: „Mit Windows starten“.
    - **Rechtsklick:** Menü mit allen Pets, Autostart und Beenden.
-3. **Status-Anzeige:** Hooks eintragen, siehe unten.
+3. **Entfernen:** **`uninstall.cmd` doppelklicken.** Es beendet aipets, schaltet „Mit Windows starten“ aus und nimmt die Hooks wieder heraus. Danach kannst du den Ordner löschen, und `%APPDATA%\aipets` (Einstellungen, Log) auch.
+
+**Ordner verschoben oder einen Agent erst später installiert?** Die Einstellungen zeigen unter „Statusanzeige“, ob die Hooks zu dieser `aipets.exe` passen. Wenn nicht, trägt der Link **„Hooks einrichten“** darunter sie mit einem Klick neu ein. Nach dem Verschieben erledigt `install.cmd` im neuen Ordner alles auf einmal, auch den Autostart.
+
+**Ohne Doppelklick:** `.\build.ps1` baut nur, `.\build.ps1 -Art` erzeugt vorher App-Icon und Sprites neu (dafür brauchst du Python mit `numpy` und `Pillow`). `aipets.exe --install` und `aipets.exe --uninstall` machen dasselbe wie die beiden cmd-Dateien, mit `--quiet` ohne Fenster. Die exe muss neben dem Ordner `pets\` liegen.
 
 **Hintergrund:** Das Tray-Programm startet jedes Pet als eigenen Prozess (`aipets.exe --pet <id>`). Stürzt ein Pet ab oder wird es beendet, startet das Tray-Programm es neu. Beendest du das Tray-Programm, verschwinden auch die Pets.
 
@@ -29,7 +37,11 @@ Pixel-Art-Desktop-Pets für Windows, eins pro KI-Agent. Die Pets sitzen auf der 
 
 Ein Klick startet Claude Code mit `--dangerously-skip-permissions`, Hermes mit `--yolo` und Codex mit `--dangerously-bypass-approvals-and-sandbox`. Gemini öffnet `https://gemini.google.com/app`, Grok `https://grok.com/`, beide im Standardbrowser. Das alles kannst du in den Einstellungen oder in `pets\<id>\pet.ini` ändern. Gemini CLI und Grok CLI sind nicht dabei; wer den Programm-Modus will, muss sie selbst installieren.
 
-## Hooks für Claude Code
+## Hooks von Hand eintragen
+
+Brauchst du normalerweise nicht: `install.cmd` und „Hooks einrichten“ tragen genau das hier ein. Die Beispiele zeigen, was in den Dateien steht, falls du etwas prüfen oder anpassen willst.
+
+### Claude Code
 
 In `%USERPROFILE%\.claude\settings.json` eintragen und den Pfad anpassen. Danach einmal `/hooks` öffnen oder Claude Code neu starten.
 
@@ -44,9 +56,9 @@ In `%USERPROFILE%\.claude\settings.json` eintragen und den Pfad anpassen. Danach
 }
 ```
 
-## Hooks für Hermes Agent
+### Hermes Agent
 
-In die `config.yaml` von Hermes eintragen. Unter Windows liegt sie in `%HERMES_HOME%`, sonst in `~/.hermes/`. Pfade in einfachen Anführungszeichen, sonst liest YAML die Backslashes als Escapes.
+In die `config.yaml` von Hermes eintragen. Sie liegt in `%HERMES_HOME%`, bei der Windows-Installation also meist in `%LOCALAPPDATA%\hermes`, sonst in `~/.hermes/`. Pfade in einfachen Anführungszeichen, sonst liest YAML die Backslashes als Escapes.
 
 ```yaml
 hooks:
@@ -69,7 +81,7 @@ hooks:
 
 Hermes fragt beim nächsten Start einmal pro Hook, ob er laufen darf. Alternativ startest du Hermes einmal mit `hermes --accept-hooks`. Prüfen kannst du das mit `hermes hooks list`.
 
-## Hooks für Codex
+### Codex
 
 In `%USERPROFILE%\.codex\hooks.json` eintragen (bzw. `%CODEX_HOME%\hooks.json`) und den Pfad anpassen. Codex startet Hook-Befehle unter Windows mit PowerShell, deshalb `& '…'` und `| Out-Null`: Ohne `Out-Null` wartet PowerShell nicht auf `aipets.exe`.
 
@@ -87,8 +99,6 @@ In `%USERPROFILE%\.codex\hooks.json` eintragen (bzw. `%CODEX_HOME%\hooks.json`) 
 ```
 
 Codex führt neue Hooks erst aus, wenn du sie freigegeben hast: In Codex `/hooks` öffnen und die sechs aipets-Hooks als vertrauenswürdig markieren. Änderst du einen Befehl (z. B. weil die exe woanders liegt), fragt Codex erneut.
-
-Ob die Hooks eingerichtet sind, zeigen auch die Einstellungen unter „Statusanzeige“.
 
 ## Mehr
 
