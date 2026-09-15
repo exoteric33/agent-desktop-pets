@@ -14,14 +14,9 @@ namespace AiPets
         public string Id, Dir, Name, OpenText;
         public int Order, Home;
         public string Program, Find, Args, Shell;
-        public string Url;      // a website instead of a program (Gemini); "" for program pets
+        public string Url;      // the pet's website, opened in the default browser in website mode
+        public string Mode;     // "program" or "website": what a click opens unless the settings say otherwise
         public string Status;   // "claude", "hermes", "codex" or "" — which hook source the pet shows
-
-        /// <summary>The pet opens a link in the browser instead of starting a program.</summary>
-        public bool IsLink
-        {
-            get { return Url.Length > 0; }
-        }
 
         public string SpritesDir
         {
@@ -87,6 +82,9 @@ namespace AiPets
             pet.Args = ini.Get("pet", "args") ?? "";
             pet.Shell = ini.Get("pet", "shell") ?? "direct";
             pet.Url = ini.Get("pet", "url") ?? "";
+            // without mode=, a pet that only has a url is a website pet
+            pet.Mode = PetSettings.CheckedMode(ini.Get("pet", "mode")
+                ?? (pet.Program.Length == 0 && pet.Url.Length > 0 ? "website" : "program"));
             pet.Status = ini.Get("pet", "status") ?? "";
             return pet;
         }
@@ -99,7 +97,13 @@ namespace AiPets
         public int Scale;           // 0 = pick from display DPI
         public bool HasPosition;
         public int X, Y;            // bottom-centre of the pet in screen pixels
-        public string WorkDir, Program, Args, Shell, Url;
+        public string WorkDir, Program, Args, Shell, Url, Mode;
+
+        /// <summary>A click opens the website in the browser instead of starting the program.</summary>
+        public bool Website
+        {
+            get { return Mode == "website"; }
+        }
 
         public static PetSettings From(PetInfo pet, Ini ini)
         {
@@ -117,7 +121,14 @@ namespace AiPets
             s.Args = ini.Get(id, "args") ?? pet.Args;
             s.Shell = ini.Get(id, "shell") ?? pet.Shell;
             s.Url = ini.Get(id, "url") ?? pet.Url;
+            s.Mode = CheckedMode(ini.Get(id, "mode") ?? pet.Mode);
             return s;
+        }
+
+        /// <summary>"website" or "program" (anything unknown).</summary>
+        public static string CheckedMode(string mode)
+        {
+            return mode == "website" ? "website" : "program";
         }
 
         public static string Number(int n)

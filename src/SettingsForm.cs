@@ -28,10 +28,11 @@ namespace AiPets
         readonly Label title = new Label(), state = new Label(), hooks = new Label();
         readonly CheckBox showBox = new CheckBox(), autostartBox = new CheckBox();
         readonly RadioButton[] sizes = new RadioButton[4];
+        readonly RadioButton programMode = new RadioButton(), websiteMode = new RadioButton();
         readonly TextBox programBox = new TextBox(), argsBox = new TextBox(), dirBox = new TextBox(), urlBox = new TextBox();
         readonly ComboBox shellBox = new ComboBox();
         readonly Button openButton = new Button(), homeButton = new Button();
-        // a program pet shows program, arguments, terminal and folder; a link pet (Gemini) only its link
+        // "Klick öffnet: Programm" shows program, arguments, terminal and folder; "Website" only the link
         readonly List<Control> programRows = new List<Control>(), linkRows = new List<Control>();
         PetProcess current;
         Ini shownIni;
@@ -58,7 +59,7 @@ namespace AiPets
             AutoScaleMode = AutoScaleMode.Dpi;
             Font = new Font("Segoe UI", 9F);
             Text = "aipets – Einstellungen";
-            ClientSize = new Size(700, 470);
+            ClientSize = new Size(700, 504);
             FormBorderStyle = FormBorderStyle.FixedSingle;
             MaximizeBox = false;
             StartPosition = FormStartPosition.CenterScreen;
@@ -169,6 +170,30 @@ namespace AiPets
             }
 
             y += 36;
+            AddLabel(page, "Klick öffnet", y);
+            // own panel: radio buttons in the page itself would share one group with the sizes
+            var modes = new Panel { Location = new Point(136, y - 4), Size = new Size(240, 24) };
+            programMode.Text = "Programm";
+            websiteMode.Text = "Website";
+            programMode.AutoSize = websiteMode.AutoSize = true;
+            programMode.Location = new Point(4, 3);
+            websiteMode.Location = new Point(120, 3);
+            foreach (RadioButton radio in new[] { programMode, websiteMode })
+            {
+                RadioButton r = radio;
+                r.CheckedChanged += delegate
+                {
+                    if (loading || !r.Checked || current == null || host == null)
+                        return;
+                    string mode = r == websiteMode ? "website" : "program";
+                    host.ChangeSetting(current, "mode", mode == current.Info.Mode ? null : mode);
+                    ShowPet(current);
+                };
+                modes.Controls.Add(r);
+            }
+            page.Controls.Add(modes);
+
+            y += 34;
             programRows.Add(AddLabel(page, "Programm", y));
             programRows.Add(SetupBox(page, programBox, y, 330));
             linkRows.Add(AddLabel(page, "Link", y));
@@ -357,10 +382,12 @@ namespace AiPets
                 if (!dirBox.Focused) dirBox.Text = s.WorkDir;
                 if (!urlBox.Focused) urlBox.Text = s.Url;
                 shellBox.SelectedIndex = Math.Max(0, Array.IndexOf(ShellValues, s.Shell));
+                programMode.Checked = !s.Website;
+                websiteMode.Checked = s.Website;
                 foreach (Control c in programRows)
-                    c.Visible = !p.Info.IsLink;
+                    c.Visible = !s.Website;
                 foreach (Control c in linkRows)
-                    c.Visible = p.Info.IsLink;
+                    c.Visible = s.Website;
                 openButton.Text = p.Info.OpenText;
                 bool ok;
                 hooks.Text = HookText(p.Info, out ok);
@@ -391,8 +418,8 @@ namespace AiPets
             PetInfo info = current.Info;
             string value = box.Text.Trim();
             string key = box == programBox ? "program" : box == argsBox ? "args" : box == urlBox ? "url" : "workdir";
-            if (info.IsLink != (key == "url"))
-                return;   // the fields of the other kind of pet are hidden
+            if (host.SettingsOf(current).Website != (key == "url"))
+                return;   // the fields of the other mode are hidden
             if (key == "workdir" && (value.Length == 0 || !Directory.Exists(value)))
             {
                 box.Text = host.SettingsOf(current).WorkDir;   // not a folder: back to the saved one

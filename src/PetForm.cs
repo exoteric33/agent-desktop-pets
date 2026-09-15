@@ -802,6 +802,10 @@ namespace AiPets
             var open = new ToolStripMenuItem(pet.OpenText, null, delegate { OpenAgent(); });
             open.Font = new Font(open.Font, FontStyle.Bold);
             var folder = new ToolStripMenuItem("Ordner", null, delegate { ChooseFolder(); });
+            var opens = new ToolStripMenuItem("Klick öffnet");
+            var openProgram = new ToolStripMenuItem("Programm", null, delegate { SetMode("program"); });
+            var openWebsite = new ToolStripMenuItem("Website", null, delegate { SetMode("website"); });
+            opens.DropDownItems.AddRange(new ToolStripItem[] { openProgram, openWebsite });
             var size = new ToolStripMenuItem("Größe");
             for (int i = 1; i <= 4; i++)
             {
@@ -831,14 +835,18 @@ namespace AiPets
 
             strip.Items.AddRange(new ToolStripItem[]
             {
-                open, folder, new ToolStripSeparator(), size, home, hide, new ToolStripSeparator(), prefs, quit,
+                open, folder, opens, new ToolStripSeparator(), size, home, hide, new ToolStripSeparator(), prefs, quit,
             });
             strip.Opening += delegate
             {
-                string dir = PetSettings.From(pet, Store.Load()).WorkDir;
-                folder.Text = "Ordner: " + ShortPath(dir) + " …";
-                folder.ToolTipText = dir;
-                folder.Visible = !pet.IsLink;   // a website has no working folder
+                PetSettings s = PetSettings.From(pet, Store.Load());
+                folder.Text = "Ordner: " + ShortPath(s.WorkDir) + " …";
+                folder.ToolTipText = s.WorkDir;
+                folder.Visible = !s.Website;   // a website has no working folder
+                openProgram.Checked = !s.Website;
+                openWebsite.Checked = s.Website;
+                openProgram.ToolTipText = s.Program;
+                openWebsite.ToolTipText = s.Url;
                 foreach (ToolStripMenuItem item in size.DropDownItems)
                     item.Checked = (int)item.Tag == scale;
                 prefs.Visible = host != null;
@@ -851,6 +859,13 @@ namespace AiPets
         {
             menuOpen = true;
             menu.Show(Cursor.Position);
+        }
+
+        /// <summary>"program" or "website"; the pet.ini default is stored as no override.</summary>
+        void SetMode(string mode)
+        {
+            Store.Update(pet.Id, "mode", mode == pet.Mode ? null : mode);
+            settingsStamp = Store.Stamp();
         }
 
         void ChooseFolder()

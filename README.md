@@ -1,13 +1,14 @@
 # aipets
 
-Pixel-Art-Desktop-Pets für Windows, eins pro KI-Agent. Die Pets sitzen auf der Taskleiste. Ein Klick öffnet ihren Agenten im Terminal, und sie zeigen an, ob er gerade arbeitet, auf dich wartet oder fertig ist.
+Pixel-Art-Desktop-Pets für Windows, eins pro KI-Agent. Die Pets sitzen auf der Taskleiste. Ein Klick öffnet ihren Agenten im Terminal oder seine Website im Browser, und sie zeigen an, ob er gerade arbeitet, auf dich wartet oder fertig ist.
 
-| Pet | Klick öffnet | Status kommt von |
-|---|---|---|
-| **Claude** | Claude Code im Windows Terminal | Claude-Code-Hooks |
-| **Hermes** | Hermes Agent in PowerShell (im Windows Terminal) | Hermes-Shell-Hooks |
-| **Astra** | Codex CLI im Windows Terminal | Codex-Hooks |
-| **Gemini** | Google Gemini (gemini.google.com) im Standardbrowser | – |
+| Pet | Klick öffnet (Standard) | Umschaltbar auf | Status kommt von |
+|---|---|---|---|
+| **Claude** | Claude Code im Windows Terminal | claude.ai | Claude-Code-Hooks |
+| **Hermes** | Hermes Agent in PowerShell (im Windows Terminal) | hermes-agent.nousresearch.com | Hermes-Shell-Hooks |
+| **Astra** | Codex CLI im Windows Terminal | chatgpt.com/codex | Codex-Hooks |
+| **Gemini** | gemini.google.com im Standardbrowser | Gemini CLI (`gemini`) | – |
+| **Grok** | grok.com im Standardbrowser | Grok CLI (`grok`) | – |
 
 ## Schnellstart
 
@@ -15,15 +16,18 @@ Pixel-Art-Desktop-Pets für Windows, eins pro KI-Agent. Die Pets sitzen auf der 
    `.\build.ps1 -Art` erzeugt vorher App-Icon und Sprites neu. Dafür brauchst du Python mit `numpy` und `Pillow`.
 2. **Starten:** `aipets.exe` doppelklicken. Die exe muss neben dem Ordner `pets\` liegen.
    Im Infobereich der Taskleiste (bei den ausgeblendeten Symbolen hinter `^`) erscheint das aipets-Icon:
-   - **Linksklick:** Einstellungen. Dort kannst du Pets ein- und ausblenden und Größe, Programm, Argumente, Terminal und Arbeitsordner einstellen, bei Gemini stattdessen den Link. Unten schaltest du „Mit Windows starten“ ein.
+   - **Linksklick:** Einstellungen. Dort kannst du Pets ein- und ausblenden, die Größe wählen und unter **„Klick öffnet“** zwischen **Programm** und **Website** umschalten.
+     - Programm: Programm, Argumente, Terminal und Arbeitsordner.
+     - Website: der Link (nur http/https; `grok.com` wird automatisch zu `https://grok.com/`).
+     - Unten schaltest du „Mit Windows starten“ ein.
    - **Rechtsklick:** Menü mit allen Pets, Autostart und Beenden.
 3. **Status-Anzeige:** Hooks eintragen, siehe unten.
 
 **Hintergrund:** Das Tray-Programm startet jedes Pet als eigenen Prozess (`aipets.exe --pet <id>`). Stürzt ein Pet ab oder wird es beendet, startet das Tray-Programm es neu. Beendest du das Tray-Programm, verschwinden auch die Pets.
 
-**Pet-Rechtsklick:** öffnen, Arbeitsordner, Größe, zurück in die Ecke, ausblenden, Einstellungen, aipets beenden.
+**Pet-Rechtsklick:** öffnen, Arbeitsordner (nur im Programm-Modus), „Klick öffnet“ → Programm / Website, Größe, zurück in die Ecke, ausblenden, Einstellungen, aipets beenden.
 
-Ein Klick startet Claude Code mit `--dangerously-skip-permissions`, Hermes mit `--yolo` und Codex mit `--dangerously-bypass-approvals-and-sandbox`. Gemini öffnet `https://gemini.google.com/app` im Standardbrowser. Das kannst du in den Einstellungen oder in `pets\<id>\pet.ini` ändern.
+Ein Klick startet Claude Code mit `--dangerously-skip-permissions`, Hermes mit `--yolo` und Codex mit `--dangerously-bypass-approvals-and-sandbox`. Gemini öffnet `https://gemini.google.com/app`, Grok `https://grok.com/`, beide im Standardbrowser. Das alles kannst du in den Einstellungen oder in `pets\<id>\pet.ini` ändern. Gemini CLI und Grok CLI sind nicht dabei; wer den Programm-Modus will, muss sie selbst installieren.
 
 ## Hooks für Claude Code
 
@@ -88,6 +92,6 @@ Ob die Hooks eingerichtet sind, zeigen auch die Einstellungen unter „Statusanz
 
 ## Mehr
 
-In [PET-BAUANLEITUNG.md](PET-BAUANLEITUNG.md) findest du Aufbau, Art-Pipeline, Status-Protokoll, eine Checkliste für neue Pets und bekannte Stolperfallen.
+In [PET-BAUANLEITUNG.md](PET-BAUANLEITUNG.md) findest du Aufbau, Art-Pipeline, Status-Protokoll, eine Checkliste für neue Pets und bekannte Stolperfallen. Wer als Agent (Claude Code, Codex, Hermes …) weiterarbeitet, startet mit [AGENTS.md](AGENTS.md).
 
 > Die Bildvorlagen in `pets/*/art/` sind Fan-Art fremder Artists bzw. nicht selbst gezeichnet. Halte das Repo privat oder ersetze die Bilder (samt `sprites/`), bevor du es veröffentlichst.

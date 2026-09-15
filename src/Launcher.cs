@@ -23,11 +23,11 @@ namespace AiPets
         /// <summary>
         /// shell=direct: the terminal runs the program itself (tab closes when it exits);
         /// shell=powershell / cmd: the program runs inside that shell, which stays open afterwards.
-        /// A link pet (url=) opens its link in the default browser.
+        /// Website mode opens the pet's link in the default browser.
         /// </summary>
         public static ProcessStartInfo BuildStartInfo(PetInfo pet, PetSettings s)
         {
-            if (pet.IsLink)
+            if (s.Website)
             {
                 string url = NormalizeUrl(s.Url);
                 if (url == null)
