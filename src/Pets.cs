@@ -14,7 +14,7 @@ namespace AiPets
         public string Id, Dir, Name, OpenText;
         public int Order, Home;
         public string Program, Find, Args, Shell;
-        public string Status;   // "claude", "hermes" or "" — which hook source the pet shows
+        public string Status;   // "claude", "hermes", "codex" or "" — which hook source the pet shows
 
         public string SpritesDir
         {

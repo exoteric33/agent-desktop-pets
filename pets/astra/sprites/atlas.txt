@@ -1,0 +1,151 @@
+cell 88 124
+frame normal_0 0 0
+frame normal_1 88 0
+frame normal_2 176 0
+frame normal_3 264 0
+frame normal_4 352 0
+frame normal_5 440 0
+frame normal_6 528 0
+frame normal_7 616 0
+frame blink_0 0 124
+frame blink_1 88 124
+frame blink_2 176 124
+frame blink_3 264 124
+frame blink_4 352 124
+frame blink_5 440 124
+frame blink_6 528 124
+frame blink_7 616 124
+frame look_0 0 248
+frame look_1 88 248
+frame look_2 176 248
+frame look_3 264 248
+frame look_4 352 248
+frame look_5 440 248
+frame look_6 528 248
+frame look_7 616 248
+frame hover_0 0 372
+frame hover_1 88 372
+frame hover_2 176 372
+frame hover_3 264 372
+frame hover_4 352 372
+frame hover_5 440 372
+frame hover_6 528 372
+frame hover_7 616 372
+frame happy_0 0 496
+frame happy_1 88 496
+frame happy_2 176 496
+frame happy_3 264 496
+frame happy_4 352 496
+frame happy_5 440 496
+frame happy_6 528 496
+frame happy_7 616 496
+frame sleep_0 0 620
+frame sleep_1 88 620
+frame sleep_2 176 620
+frame sleep_3 264 620
+frame sleep_4 352 620
+frame sleep_5 440 620
+frame sleep_6 528 620
+frame sleep_7 616 620
+frame bounce_-2 0 744
+frame bounce_-1 88 744
+frame bounce_1 176 744
+frame bounce_2 264 744
+frame bounce_3 352 744
+frame m_normal_0 440 744
+frame m_normal_1 528 744
+frame m_normal_2 616 744
+frame m_normal_3 0 868
+frame m_normal_4 88 868
+frame m_normal_5 176 868
+frame m_normal_6 264 868
+frame m_normal_7 352 868
+frame m_blink_0 440 868
+frame m_blink_1 528 868
+frame m_blink_2 616 868
+frame m_blink_3 0 992
+frame m_blink_4 88 992
+frame m_blink_5 176 992
+frame m_blink_6 264 992
+frame m_blink_7 352 992
+frame m_look_0 440 992
+frame m_look_1 528 992
+frame m_look_2 616 992
+frame m_look_3 0 1116
+frame m_look_4 88 1116
+frame m_look_5 176 1116
+frame m_look_6 264 1116
+frame m_look_7 352 1116
+frame m_hover_0 440 1116
+frame m_hover_1 528 1116
+frame m_hover_2 616 1116
+frame m_hover_3 0 1240
+frame m_hover_4 88 1240
+frame m_hover_5 176 1240
+frame m_hover_6 264 1240
+frame m_hover_7 352 1240
+frame m_happy_0 440 1240
+frame m_happy_1 528 1240
+frame m_happy_2 616 1240
+frame m_happy_3 0 1364
+frame m_happy_4 88 1364
+frame m_happy_5 176 1364
+frame m_happy_6 264 1364
+frame m_happy_7 352 1364
+frame m_sleep_0 440 1364
+frame m_sleep_1 528 1364
+frame m_sleep_2 616 1364
+frame m_sleep_3 0 1488
+frame m_sleep_4 88 1488
+frame m_sleep_5 176 1488
+frame m_sleep_6 264 1488
+frame m_sleep_7 352 1488
+frame m_bounce_-2 440 1488
+frame m_bounce_-1 528 1488
+frame m_bounce_1 616 1488
+frame m_bounce_2 0 1612
+frame m_bounce_3 88 1612
+sprite spark3 0 1736 7 7 3 3
+sprite spark2 8 1736 5 5 2 2
+sprite spark1 14 1736 3 3 1 1
+sprite spark0 18 1736 1 1 0 0
+sprite z2 20 1736 6 6 3 3
+sprite z1 27 1736 5 5 2 2
+sprite z0 33 1736 4 4 2 2
+sprite star2 38 1736 6 6 3 3
+sprite star1 45 1736 4 4 2 2
+sprite star0 50 1736 2 2 1 1
+sprite vstar2 53 1736 6 6 3 3
+sprite vstar1 60 1736 4 4 2 2
+sprite bubble_r_on 65 1736 22 17 0 16
+sprite bubble_r_off 88 1736 22 17 0 16
+sprite bubble_r_spin0 111 1736 22 17 0 16
+sprite bubble_r_spin1 134 1736 22 17 0 16
+sprite bubble_r_spin2 157 1736 22 17 0 16
+sprite bubble_r_spin3 180 1736 22 17 0 16
+sprite bubble_r_spin4 203 1736 22 17 0 16
+sprite bubble_r_spin5 226 1736 22 17 0 16
+sprite bubble_r_spin6 249 1736 22 17 0 16
+sprite bubble_r_spin7 272 1736 22 17 0 16
+sprite bubble_r_wait 295 1736 22 17 0 16
+sprite bubble_r_done 318 1736 22 17 0 16
+sprite bubble_l_on 341 1736 22 17 21 16
+sprite bubble_l_off 364 1736 22 17 21 16
+sprite bubble_l_spin0 387 1736 22 17 21 16
+sprite bubble_l_spin1 410 1736 22 17 21 16
+sprite bubble_l_spin2 433 1736 22 17 21 16
+sprite bubble_l_spin3 456 1736 22 17 21 16
+sprite bubble_l_spin4 479 1736 22 17 21 16
+sprite bubble_l_spin5 502 1736 22 17 21 16
+sprite bubble_l_spin6 525 1736 22 17 21 16
+sprite bubble_l_spin7 548 1736 22 17 21 16
+sprite bubble_l_wait 571 1736 22 17 21 16
+sprite bubble_l_done 594 1736 22 17 21 16
+anchor bubble 22 16
+anchor zzz 38 10
+anchor logo 42 66
+anchor head 44 32
+facing left
+anim twinkle star1 star1 star2 star2 star1 star0
+anim twinkle2 vstar1 vstar1 vstar2 vstar1 star0
+anim spin spin0 spin1 spin2 spin3 spin4 spin5 spin6 spin7

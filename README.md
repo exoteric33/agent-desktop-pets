@@ -6,6 +6,7 @@ Pixel-Art-Desktop-Pets für Windows, eins pro KI-Agent. Die Pets sitzen auf der 
 |---|---|---|
 | **Claude** | Claude Code im Windows Terminal | Claude-Code-Hooks |
 | **Hermes** | Hermes Agent in PowerShell (im Windows Terminal) | Hermes-Shell-Hooks |
+| **Astra** | Codex CLI im Windows Terminal | Codex-Hooks |
 
 ## Schnellstart
 
@@ -21,7 +22,7 @@ Pixel-Art-Desktop-Pets für Windows, eins pro KI-Agent. Die Pets sitzen auf der 
 
 **Pet-Rechtsklick:** öffnen, Arbeitsordner, Größe, zurück in die Ecke, ausblenden, Einstellungen, aipets beenden.
 
-Ein Klick startet Claude Code mit `--dangerously-skip-permissions` und Hermes mit `--yolo`. Das kannst du in den Einstellungen oder in `pets\<id>\pet.ini` ändern.
+Ein Klick startet Claude Code mit `--dangerously-skip-permissions`, Hermes mit `--yolo` und Codex mit `--dangerously-bypass-approvals-and-sandbox`. Das kannst du in den Einstellungen oder in `pets\<id>\pet.ini` ändern.
 
 ## Hooks für Claude Code
 
@@ -62,6 +63,25 @@ hooks:
 ```
 
 Hermes fragt beim nächsten Start einmal pro Hook, ob er laufen darf. Alternativ startest du Hermes einmal mit `hermes --accept-hooks`. Prüfen kannst du das mit `hermes hooks list`.
+
+## Hooks für Codex
+
+In `%USERPROFILE%\.codex\hooks.json` eintragen (bzw. `%CODEX_HOME%\hooks.json`) und den Pfad anpassen. Codex startet Hook-Befehle unter Windows mit PowerShell, deshalb `& '…'` und `| Out-Null`: Ohne `Out-Null` wartet PowerShell nicht auf `aipets.exe`.
+
+```json
+{
+  "hooks": {
+    "UserPromptSubmit":  [{ "hooks": [{ "type": "command", "command": "& 'C:\\Pfad\\zu\\aipets.exe' --hook codex working | Out-Null", "timeout": 10, "async": true }] }],
+    "PermissionRequest": [{ "matcher": "*", "hooks": [{ "type": "command", "command": "& 'C:\\Pfad\\zu\\aipets.exe' --hook codex waiting | Out-Null", "timeout": 10, "async": true }] }],
+    "PostToolUse":       [{ "matcher": "*", "hooks": [{ "type": "command", "command": "& 'C:\\Pfad\\zu\\aipets.exe' --hook codex resume | Out-Null", "timeout": 10, "async": true }] }],
+    "Stop":              [{ "hooks": [{ "type": "command", "command": "& 'C:\\Pfad\\zu\\aipets.exe' --hook codex done | Out-Null", "timeout": 10, "async": true }] }],
+    "Interrupt":         [{ "hooks": [{ "type": "command", "command": "& 'C:\\Pfad\\zu\\aipets.exe' --hook codex idle | Out-Null", "timeout": 3, "async": true }] }],
+    "SessionEnd":        [{ "hooks": [{ "type": "command", "command": "& 'C:\\Pfad\\zu\\aipets.exe' --hook codex end | Out-Null", "timeout": 3 }] }]
+  }
+}
+```
+
+Codex führt neue Hooks erst aus, wenn du sie freigegeben hast: In Codex `/hooks` öffnen und die sechs aipets-Hooks als vertrauenswürdig markieren. Änderst du einen Befehl (z. B. weil die exe woanders liegt), fragt Codex erneut.
 
 Ob die Hooks eingerichtet sind, zeigen auch die Einstellungen unter „Statusanzeige“.
 

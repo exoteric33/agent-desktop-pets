@@ -27,6 +27,7 @@ Sie ist auch als Kontext für Claude gedacht: „Lies `PET-BAUANLEITUNG.md` und 
 |---|---|---|---|
 | Claude | Atmen, wehende Haare, Antenne, Blinzeln, Lächeln, Hüpfer | `wt → claude.exe --dangerously-skip-permissions` | Claude-Code-Hooks |
 | Hermes | nur Gesicht: Blinzeln, Aufschauen, Lächeln, glücklich, schlafen; Musiknoten aus dem Kopfhörer | `wt → powershell -NoExit → hermes --yolo` | Hermes-Shell-Hooks |
+| Astra | Atmen, wehende Haare, funkelnde Sterne in den Galaxie-Strähnen, Ahoge, Katzenohren stellen sich auf, Blinzeln, Aufschauen, „:3“, glücklich, schlafen, Hüpfer; OpenAI-Logo auf dem Shirt, Sterne steigen auf, während Codex arbeitet | `wt → cmd /c codex.cmd --dangerously-bypass-approvals-and-sandbox` | Codex-Hooks |
 
 ## 2. Ordner
 
@@ -44,7 +45,8 @@ aipets\
 │  │  ├─ pet.ini          Name, Befehl, Terminal, Statusquelle, Home-Position
 │  │  ├─ art\             source.png, make_sprites.py, preview\ (nicht im Repo)
 │  │  └─ sprites\         atlas.png, atlas.txt, icon.ico  ← liest das Programm zur Laufzeit
-│  └─ hermes\             genauso (source.jpg)
+│  ├─ hermes\             genauso (source.jpg)
+│  └─ astra\              genauso (source.png)
 └─ src\
    ├─ Program.cs          Einstieg: Tray / --pet / --hook / --snapshot / --status / --command
    ├─ TrayHost.cs         Tray-Icon, Menü, Pet-Prozesse starten und neu starten, Befehle der Pets
@@ -53,7 +55,7 @@ aipets\
    ├─ Pets.cs             pet.ini lesen (PetInfo), wirksame Einstellungen (PetSettings)
    ├─ Atlas.cs            atlas.png/atlas.txt laden, Frames und Sprites zeichnen
    ├─ Launcher.cs         Klick-Aktion: Programm finden, Terminal/Shell-Befehl bauen
-   ├─ Status.cs           Hook-Befehl (claude, hermes) + Auswertung der Statusdateien
+   ├─ Status.cs           Hook-Befehl (claude, hermes, codex) + Auswertung der Statusdateien
    ├─ Native.cs           Win32: Layered Window, DPI, Idle, Vollbild, Logon-Umgebung, IPC
    └─ App.cs              Pfade, settings.ini (Ini/Store), Autostart, Log
 ```
@@ -86,7 +88,7 @@ program=hermes                               ; Name im PATH oder voller Pfad
 find=%LOCALAPPDATA%\hermes\bin\hermes.exe    ; bekannte Installationsorte, vor dem PATH probiert (;-getrennt)
 args=--yolo
 shell=powershell                             ; direct | powershell | cmd
-status=hermes                                ; claude | hermes | leer
+status=hermes                                ; claude | hermes | codex | leer
 home=88                                      ; Abstand zum rechten Bildschirmrand in Sprite-Pixeln
 ```
 
@@ -101,19 +103,26 @@ home=88                                      ; Abstand zum rechten Bildschirmran
    - Hintergrund per Flood-Fill vom Rand entfernen, dann den größten zusammenhängenden Blob behalten.
    - Claude: `pockets` für eingeschlossene Hintergrundlöcher.
    - Hermes: grauen Bodenschatten wegfluten und weiße Randlichter in Haaren und Stiefeln schwarz malen. Beim Verkleinern würden sie zu Pünktchen.
+   - Astra: dieselbe Vorlage wie Claude (Shirt-Schriftzug „ASTRA 6“, Ärmeltext, Wasserzeichen). Schrift wird mit Weiß zugeflossen, das Wasserzeichen auf dem Rock bekommt das glatte Lila (Zufließen würde die Faltenlinien hineinziehen).
 2. **`kit.pixelise(rgb, fg, factor, palette, outline, outline_bottom)`:**
    - Blöcke verkleinern. Dünne dunkle Linien bleiben erhalten: Hat ein Block genug dunkle Pixel, bekommt er deren Farbe.
    - Palette per k-means (Lab), einzelne Pixel glätten, 1 px Außenlinie.
-   - `outline_bottom=False`, wenn die Figur unten abgeschnitten ist (Claude). Hermes sitzt komplett im Bild.
+   - `outline_bottom=False`, wenn die Figur unten abgeschnitten ist (Claude, Astra). Hermes sitzt komplett im Bild.
    - **Faktor:** Claude 3 bei 263×350 Vorlage. Hermes 6 bei 720×1280; kleiner geht nicht, sonst ist das Gesicht zu klein für Animationen.
+   - Astra: 252×304 ist enger zugeschnitten als Claudes Bild. Die Vorlage wird deshalb vorher 1,2× vergrößert (`ENLARGE`), dann Faktor 3, 28 Farben. So sind Kopf und Oberkörper so groß wie bei Claude.
 3. **Handarbeit** mit `kit.patch(img, x, y, rows, colors)` (Zeichen → Farbe, `.` = unverändert). Was die Verkleinerung zerstört, wird neu gesetzt: Claude-Sternchen, Hermes-Kopfhörer und „N“-Halsband.
+   - Astras OpenAI-Logo ist aus dem Vektorlogo bei 12 px gerastert: punktsymmetrisch gemittelt, drei Tinten (voll, 62 %, 30 % auf Shirt-Weiß). Unter 12 px zerfällt der Knoten, bei 2× Anzeige liest er sich klar.
 4. **Gesichter:** Die Pipeline zerstört Augen und Mund praktisch immer, sie werden als Patches gezeichnet.
    - Koordinaten findest du über einen Symbol-Dump des Basis-Sprites plus Grid-Zoom mit Koordinatenlinien.
    - Faces-Vorschau in `preview\faces.png`.
 5. **Animation** (bildspezifisch):
    - **Claude:** 8 Phasen je Gesicht (`hair_wave`, `wiggle_ahoge`, `restretch` fürs Atmen) plus `bounce_-2..3`.
    - **Hermes:** 1 Phase je Gesicht, keine Bounce-Frames, die Bewegung steckt nur im Gesicht.
+   - **Astra:** wie Claude 8 Phasen je Gesicht plus `bounce_-2..3`, dazu `twinkle_stars` (die Sterne in den Galaxie-Strähnen funkeln versetzt) und `perk_ears` für hover und happy.
+     - Ihr `hair_wave` erkennt Haar an der Farbe (schwarz oder Galaxie-Blau), nicht an der Helligkeit: sonst würde der lila Rock mitwehen.
+     - Gesichter: normal, blink, look, hover („:3“), happy, sleep.
 6. **`mirror`:** alle Frames gespiegelt (`m_…`). Logos werden zurückgedreht (Claudes Haarspange, Hermes' „N“).
+   - Astra: Das Logo kommt erst auf die fertige (ggf. gespiegelte) Zelle, mit dem Versatz aus Atmen und Hüpfer (`with_logo`). Ein fester Ausschnitt würde bei Frames mit verdoppelten Zeilen danebenliegen.
 7. **Effekte:** Funken, Zzz, Musiknoten und die Sprechblasen über `kit.bubbles(contents, outline, fill)`. `contents` sagt, was die Blase zeigen kann: `on`/`off` (Prompt mit blinkendem Cursor), `spin*`, `wait`, `done`.
 8. **Ausgabe:** `kit.write_atlas(...)` → `sprites/atlas.png` + `atlas.txt`, `kit.make_icon(head, …)` → `icon.ico` (BMP-Einträge!), Vorschaubilder.
 
@@ -172,7 +181,7 @@ anim <name> <sprite> <sprite> …           # optional: burst, twinkle*, z, spin
 | Stop | `--hook claude done` | fertig |
 | SessionEnd | `--hook claude end` | Datei löschen |
 
-- **Zeitstempel:** die Prozess-Startzeit. Dadurch überschreiben verspätete async-Hooks keinen neueren Zustand.
+- **Zeitstempel:** die Prozess-Startzeit. Dadurch überschreiben verspätete async-Hooks keinen neueren Zustand. Ein Named Mutex `Local\aipets.status.<quelle>-<session_id>` hält Lesen, Vergleichen und Schreiben zusammen.
 - **PID:** vom Vorfahren `claude.exe`.
 - **Esc-Abbruch:** erkennt das Pet am Transcript-Marker `[Request interrupted by user`.
 - **Stale-Timeout:** 15 min.
@@ -191,6 +200,28 @@ anim <name> <sprite> <sprite> …           # optional: burst, twinkle*, z, spin
 - **Subagents:** öffnen eigene Turns im selben Prozess. Deshalb zählt die Datei offene Turns, und ein Named Mutex `Local\aipets.status.hermes-<pid>` serialisiert parallele Hooks.
 - **Freigaben:** Hermes verlangt pro (Event, Befehl) eine einmalige Freigabe (`shell-hooks-allowlist.json`, `hermes hooks list`).
 - **Stale-Timeout:** 2 h, nur für verlorene Hooks. Das Ende eines Turns meldet Hermes immer, auch bei Abbruch.
+
+**Codex** (`quelle=codex`, `hooks.json` im Codex-Home, eine Datei pro `session_id` wie bei Claude, Extra = `transcript_path`, bei Codex meist `null`):
+
+| Codex-Event | Aufruf | Wirkung |
+|---|---|---|
+| UserPromptSubmit (async) | `--hook codex working` | arbeitet |
+| PermissionRequest (async) | `--hook codex waiting` | braucht dich |
+| PostToolUse (async) | `--hook codex resume` | Waiting → Working, hält einen laufenden Turn frisch |
+| Stop (async) | `--hook codex done` | fertig |
+| Interrupt (async) | `--hook codex idle` | Esc: still |
+| SessionEnd | `--hook codex end` | Datei löschen |
+
+- **Aufruf:** Codex startet Hook-Befehle unter Windows mit `powershell.exe -NoProfile -Command "<befehl>"`. Deshalb `& '…\aipets.exe' --hook codex … | Out-Null`. Ohne `Out-Null` wartet PowerShell nicht auf die GUI-exe und der Vorfahre `codex.exe` ist nicht mehr sicher zu finden.
+- **Async:** PowerShell braucht rund eine halbe Sekunde zum Starten. Deshalb laufen alle Hooks im Hintergrund, außer SessionEnd (bei Codex immer synchron, höchstens 3 s). Die Reihenfolge sichern Prozess-Startzeit und Mutex.
+- **PID:** vom Vorfahren `codex.exe`. Das gilt auch für den App-Server der Codex-Desktop-App, die dieselbe `hooks.json` liest.
+- **Stop kommt nur, wenn ein Turn normal endet.** Bricht er mit einem Fehler ab, meldet Codex nichts.
+  - Nach 15 min ohne Hook zeigt das Pet still, die Datei bleibt aber auf Working.
+  - Läuft ein einzelner Befehl länger, holt das nächste `resume` den Spinner zurück.
+- **Freigaben:** Codex führt Hooks erst nach einer Freigabe aus (`/hooks`).
+  - Gespeichert wird sie als `[hooks.state.'<pfad>\hooks.json:<event>:0:0'] trusted_hash` in `config.toml`. Der Hash hängt am Befehl: Liegt die exe woanders, sind neue Freigaben nötig.
+  - Ohne TUI geht es über `codex app-server` (JSON-RPC über stdio), genau wie `/hooks`: `hooks/list` liefert `key` und `currentHash`, `config/batchWrite` mit `keyPath: "hooks.state"` und `mergeStrategy: "upsert"` setzt `trusted_hash`.
+- **Stale-Timeout:** 15 min seit dem letzten Hook.
 
 **Pet** (`StatusMonitor`, alle 500 ms):
 - Stirbt der Agent-Prozess, wird die Datei gelöscht.
@@ -222,6 +253,8 @@ anim <name> <sprite> <sprite> …           # optional: burst, twinkle*, z, spin
   - Der Hook muss stdin komplett lesen, sonst sieht Hermes einen Broken Pipe.
   - Die IDs stehen vor dem Nutzertext; die Regex nimmt jeweils den ersten Treffer.
 - **YAML:** Windows-Pfade in `config.yaml` nur in einfachen Anführungszeichen. In doppelten ist `\U…` ein Escape.
+- **Codex-Hooks laufen in Windows PowerShell 5.1**, nicht direkt: GUI-exe nur mit `| Out-Null` aufrufen (siehe Abschnitt 7). Ein Exit-Code aus einem inneren Aufruf kommt nur mit `; exit $LASTEXITCODE` bei Codex an.
+- **Codex zum Testen ohne Spuren:** `codex exec --ephemeral --ignore-user-config --dangerously-bypass-hook-trust -c "hooks.<Event>=[{hooks=[{type=…,command=…}]}]"`. Ein zusätzlicher UserPromptSubmit-Hook mit `exit 2` blockt den Prompt, dann gibt es keinen Modellaufruf.
 - **Icons:** `System.Drawing.Icon` liest keine PNG-komprimierten ICO-Einträge (Pillow-Standard). Daraus wird bunter Pixelmüll. Deshalb `bitmap_format="bmp"`.
 - **`new Bitmap(pfad)` sperrt die Datei**, solange das Bitmap lebt. Der Atlas wird deshalb aus dem Speicher dekodiert.
 - **Einstellungsfenster-Snapshot:**

@@ -438,6 +438,11 @@ namespace AiPets
                 file = HermesConfig();
                 marker = App.ExePath;
             }
+            else if (pet.Status == "codex")
+            {
+                file = Path.Combine(CodexHome(), "hooks.json");
+                marker = App.ExePath.Replace("\\", "\\\\");
+            }
             else
             {
                 return "–";
@@ -466,6 +471,14 @@ namespace AiPets
                     home = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".hermes");
             }
             return Path.Combine(home, "config.yaml");
+        }
+
+        static string CodexHome()
+        {
+            string home = Environment.GetEnvironmentVariable("CODEX_HOME");
+            return string.IsNullOrEmpty(home)
+                ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".codex")
+                : home;
         }
 
         bool snapshot;

@@ -15,7 +15,7 @@ namespace AiPets
     /// <summary>
     /// One file per agent session in %APPDATA%\aipets\status\&lt;source&gt;\, written by the agent's
     /// hooks (aipets.exe --hook &lt;source&gt; &lt;event&gt;) and read by the pets.
-    /// Line format: state|unix ms|agent pid|extra (Claude: transcript path, Hermes: open turn ids)
+    /// Line format: state|unix ms|agent pid|extra (Claude, Codex: transcript path, Hermes: open turn ids)
     /// </summary>
     sealed class StatusEntry
     {
@@ -102,7 +102,8 @@ namespace AiPets
                 switch (source)
                 {
                     case "claude":
-                        Claude(what, input);
+                    case "codex":
+                        Session(source, what, input);
                         break;
                     case "hermes":
                         Hermes(what, input);
@@ -119,51 +120,72 @@ namespace AiPets
         }
 
         /// <summary>
+        /// Claude Code and Codex, one file per session_id.
         /// Claude Code: UserPromptSubmit → working, PostToolUse → resume, Notification → waiting,
-        /// Stop → done, SessionEnd → end. One file per session_id.
+        /// Stop → done, SessionEnd → end.
+        /// Codex: UserPromptSubmit → working, PostToolUse → resume, PermissionRequest → waiting,
+        /// Stop → done, Interrupt → idle, SessionEnd → end.
         /// </summary>
-        static void Claude(string what, string input)
+        static void Session(string source, string what, string input)
         {
             string id = JsonString(input, "session_id");
             if (string.IsNullOrEmpty(id) || id.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
                 return;
-            string path = Path.Combine(StatusEntry.Folder("claude"), id + ".txt");
+            string path = Path.Combine(StatusEntry.Folder(source), id + ".txt");
             if (what == "end")
             {
                 File.Delete(path);
                 return;
             }
 
-            // Claude Code spawns hooks in event order; async ones may finish out of order,
-            // so a hook never overwrites a state recorded by a later-spawned one
+            // the agents spawn hooks in event order; async ones may finish out of order, so a hook
+            // never overwrites a state recorded by a later-spawned one (the mutex keeps reading and
+            // writing together)
             long time = StatusEntry.ToUnix(Process.GetCurrentProcess().StartTime.ToUniversalTime());
-            StatusEntry current = StatusEntry.Read(path);
-            if (current != null && current.Time > time)
-                return;
-
-            AgentState state;
-            switch (what)
+            using (var mutex = new Mutex(false, "Local\\aipets.status." + source + "-" + id))
             {
-                case "working": state = AgentState.Working; break;
-                case "waiting": state = AgentState.Waiting; break;
-                case "done": state = AgentState.Done; break;
-                case "resume":
-                    // a tool finished: ends a permission wait, but must not revive a finished
-                    // turn (background agents keep running tools after Stop)
-                    if (current != null && current.State != AgentState.Waiting)
+                bool owned;
+                try { owned = mutex.WaitOne(3000); }
+                catch (AbandonedMutexException) { owned = true; }
+                try
+                {
+                    StatusEntry current = StatusEntry.Read(path);
+                    if (current != null && current.Time > time)
                         return;
-                    state = AgentState.Working;
-                    break;
-                default:
-                    return;
+
+                    AgentState state;
+                    switch (what)
+                    {
+                        case "working": state = AgentState.Working; break;
+                        case "waiting": state = AgentState.Waiting; break;
+                        case "done": state = AgentState.Done; break;
+                        case "idle": state = AgentState.Idle; break;   // Codex: Esc interrupted the turn
+                        case "resume":
+                            // a tool finished: ends a permission wait, but must not revive a finished
+                            // turn (background agents keep running tools after Stop). Codex also
+                            // refreshes a working turn: its hooks are the only sign of activity
+                            if (current != null && current.State != AgentState.Waiting
+                                && !(source == "codex" && current.State == AgentState.Working))
+                                return;
+                            state = AgentState.Working;
+                            break;
+                        default:
+                            return;
+                    }
+                    new StatusEntry
+                    {
+                        State = state,
+                        Time = time,
+                        Pid = ProcessInfo.FindAncestor(source, 6),   // claude.exe / codex.exe
+                        Extra = JsonString(input, "transcript_path") ?? "",
+                    }.Write(path);
+                }
+                finally
+                {
+                    if (owned)
+                        mutex.ReleaseMutex();
+                }
             }
-            new StatusEntry
-            {
-                State = state,
-                Time = time,
-                Pid = ProcessInfo.FindAncestor("claude", 6),
-                Extra = JsonString(input, "transcript_path") ?? "",
-            }.Write(path);
         }
 
         /// <summary>
@@ -293,7 +315,7 @@ namespace AiPets
         const int TailBytes = 16 * 1024;
 
         readonly string folder;
-        readonly bool claudeTranscripts;
+        readonly bool claudeTranscripts, codex;
         readonly long staleMs;
         readonly Dictionary<string, long> checkedTranscripts = new Dictionary<string, long>();
 
@@ -304,9 +326,10 @@ namespace AiPets
         {
             folder = StatusEntry.Folder(source);
             claudeTranscripts = source == "claude";
-            // Claude's transcript shows activity, so a quiet session is stale soon; Hermes always
-            // reports the end of a turn, the timeout only catches lost hooks
-            staleMs = claudeTranscripts ? 15 * 60 * 1000L : 2 * 3600 * 1000L;
+            codex = source == "codex";
+            // Claude's transcript and Codex's tool hooks show activity, so a quiet session is stale
+            // soon; Hermes always reports the end of a turn, the timeout only catches lost hooks
+            staleMs = claudeTranscripts || codex ? 15 * 60 * 1000L : 2 * 3600 * 1000L;
         }
 
         public void Scan()
@@ -335,13 +358,17 @@ namespace AiPets
                 }
                 if (s.State == AgentState.Working || s.State == AgentState.Waiting)
                 {
-                    long activity = claudeTranscripts ? Math.Max(s.Time, TranscriptTime(s.Extra)) : s.Time;
+                    long activity = claudeTranscripts || codex ? Math.Max(s.Time, TranscriptTime(s.Extra)) : s.Time;
                     if ((claudeTranscripts && Interrupted(s)) || now - activity > staleMs)
                     {
-                        // Esc in Claude Code does not fire Stop; don't spin forever
+                        // Esc in Claude Code does not fire Stop, a failed Codex turn neither; don't spin forever
                         s.State = AgentState.Idle;
-                        s.Time = now;
-                        try { s.Write(path); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+                        if (!codex)
+                        {
+                            s.Time = now;
+                            try { s.Write(path); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+                        }
+                        // Codex keeps its file: the next tool hook of a long-running turn brings the spinner back
                     }
                 }
                 if (s.State == AgentState.Working) working = true;
