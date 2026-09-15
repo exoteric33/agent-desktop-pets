@@ -1,14 +1,15 @@
 """
-Builds the Grok pet's sprite atlas from source.png (Grok-chan with glasses and tablet).
+Builds the Grok pet's sprite atlas from source.png (Grok-chan winking with a peace sign).
 
-Pipeline: cut the character out of the white background -> paint the shirt
-lettering "grok" over with plain shirt black -> shrink to 0.7 (the drawing is
-big; this makes her about as tall as Hermes) -> 3x line-preserving downscale ->
-28-colour k-means palette -> outline -> take the watch off her wrist -> faces
-(normal, blink, look with a glint on her glasses, hover with a wink, happy,
-sleep) -> animation frames (breathing, swaying hair tips, ahoge, bounce) ->
-mirrored set -> xAI logo on the shirt -> effect sprites (sparks, Zzz, speech
-bubble with an X prompt and a turning-line spinner).
+Pipeline: cut the character out of the white background, including the many
+gaps between her curls -> paint the shirt lettering "grok" over with plain shirt
+black -> shrink to 0.55 (the drawing is big; this keeps her the size of the
+previous Grok) -> 3x line-preserving downscale -> 28-colour k-means palette ->
+outline -> faces (normal with both eyes open, blink, look, hover = the wink from
+the drawing, happy, sleep) -> animation frames (breathing, swaying hair tips,
+ahoge, the peace sign bobbing on hover and click, bounce) -> mirrored set ->
+xAI logo on the shirt -> effect sprites (sparks, Zzz, speech bubble with an X
+prompt and a turning-line spinner).
 
 Outputs: ../sprites/atlas.png, atlas.txt, icon.ico and preview/*.png
 Run:  python pets/grok/art/make_sprites.py   (or build.ps1 -Art)
@@ -25,29 +26,48 @@ import pixelkit as kit  # noqa: E402
 
 HERE, SPRITES, PREVIEW = kit.pet_dirs(__file__)
 
-ENLARGE = 0.7       # 548 x 704 is much bigger than the other drawings
+ENLARGE = 0.55      # 1024 x 900 is much bigger than the other drawings
 FACTOR = 3          # (resized) source pixels per sprite pixel
 PALETTE_SIZE = 28
 OUTLINE = (16, 14, 18)
-FRAME_W, FRAME_H = 119, 167  # character cell; base sprite (115 x 163) sits at (2, 4)
+FRAME_W, FRAME_H = 122, 166  # character cell; base sprite (118 x 162) sits at (2, 4)
 BASE_X, BASE_Y = 2, 4
 PHASES = 8
 
 
 # ----------------------------------------------------------------- source prep
 
+# white areas inside the figure that are not background: hair streak, face (eye, teeth), shirt lettering, hair clip
+KEEP_WHITE = [(378, 70, 446, 268), (420, 150, 600, 300), (430, 385, 575, 435), (515, 95, 580, 155)]
+
+
 def cut_out(rgb):
     h, w, _ = rgb.shape
-    dist = np.abs(rgb - 253).max(axis=2)
-    fg = ~kit.flood(dist <= 14, kit.border_seeds(h, w))
-    return kit.largest_blob(fg)
+    dist = np.abs(rgb - 255).max(axis=2)
+    fg = kit.largest_blob(~kit.flood(dist <= 16, kit.border_seeds(h, w)))
+
+    # her curls enclose lots of background: every pure white patch outside KEEP_WHITE is a hole
+    white = fg & (dist <= 10)
+    keep = np.zeros_like(white)
+    for x0, y0, x1, y1 in KEEP_WHITE:
+        keep[y0:y1, x0:x1] = True
+    seen = np.zeros_like(white)
+    holes = np.zeros_like(white)
+    for y, x in zip(*np.where(white & ~keep)):
+        if seen[y, x]:
+            continue
+        blob = kit.flood(white, [(y, x)])
+        seen |= blob
+        if blob.sum() >= 12 and not (blob & keep).any():
+            holes |= blob
+    return fg & ~kit.grow(holes)
 
 
 def remove_lettering(rgb):
-    """Paint the white 'grok' and its dark rim over with the plain shirt black of the rows around it."""
-    y0, y1, x0, x1 = 294, 340, 200, 322
-    shirt = np.concatenate([rgb[284:293, x0:x1].reshape(-1, 3), rgb[341:350, x0:x1].reshape(-1, 3)])
-    shirt = np.median(shirt[shirt @ [0.299, 0.587, 0.114] < 80], axis=0)
+    """Paint the white 'grok' over with the plain shirt black of the rows around it (diffusing leaves a ghost)."""
+    y0, y1, x0, x1 = 386, 436, 432, 574
+    shirt = np.concatenate([rgb[372:384, x0:x1].reshape(-1, 3), rgb[438:450, x0:x1].reshape(-1, 3)])
+    shirt = np.median(shirt[shirt @ [0.299, 0.587, 0.114] < 90], axis=0)
     fill = rgb.copy()
     fill[y0:y1, x0:x1] = shirt
     return fill
@@ -61,16 +81,19 @@ def resize(rgb, fg):
     return np.array(small).astype(np.float64), np.array(mask) >= 128
 
 
-# ----------------------------------------------------------------- hand-drawn details
+# ----------------------------------------------------------------- faces
 
 COLORS = {
-    "a": (13, 11, 11),     # line
-    "m": (80, 59, 55),     # soft line
-    "A": (254, 230, 218),  # skin
-    "y": (251, 221, 207),  # skin shade
-    "x": (243, 205, 190),  # skin shadow
-    "p": (242, 168, 168),  # blush
-    "C": (249, 249, 249),  # glint
+    "a": (8, 6, 7),        # line
+    "d": (27, 24, 27),     # iris dark
+    "m": (61, 58, 61),     # iris
+    "q": (93, 83, 85),     # iris light
+    "B": (238, 236, 237),  # highlight
+    "z": (253, 220, 204),  # skin
+    "y": (249, 205, 187),  # skin shade
+    "x": (246, 188, 169),  # skin shadow / blush
+    "p": (240, 150, 150),  # happy blush
+    "k": (87, 39, 32),     # mouth line
 }
 
 
@@ -78,75 +101,67 @@ def patch(img, x0, y0, rows):
     return kit.patch(img, x0, y0, rows, COLORS)
 
 
-def take_off_watch(base):
-    """The user wants her without the watch: skin over the case and band, the wrist outline carried through."""
-    return patch(base, 80, 110, [
-        "....A.......",
-        ".AAAAA......",
-        ".yAAAAA.....",
-        ".yyAAAA.....",
-        ".xyyAAAAAm..",
-        "..xyyAAm....",
-        "...xmm......",
-    ])
+# the drawing: her left eye (left in the picture) open at x 37..45, y 36..39; her right eye winks at x 54..61, y 31..33;
+# the open mouth x 48..55, y 42..47
+LEFT_EYE, RIGHT_EYE, MOUTH_AT = (37, 36), (54, 30), (47, 42)
+LEFT_SKIN = [".zzzzzzz."] * 4   # the outer columns belong to the hair and the lash tip
+RIGHT_SKIN = ["........", "zzzzzzzz", "zzzzzzzz", "zzzzzzzz"]
+MOUTH_SKIN = [".zzzzzzzz.", "zzzzzzzzzz", "zzzzzzzzzz", "zzzzzzzzzz", ".zzzzzzzz.", "..zzzzzz.."]
 
-
-# her right eye (higher, on the right in the picture) sits under the top rim of its lens, x 53..61, y 29..32;
-# the left eye x 37..47, y 35..37
-RIGHT_EYE, LEFT_EYE = (53, 29), (37, 35)
-RIGHT_SKIN = [".AAAAAAA.", "AAAAAAAAA", "AAAAAAAAA", ".AAAAAAA."]
-LEFT_SKIN = [".AAAAAAAAA.", "AAAAAAAAAAA", ".AAAAAAAAA."]
-EYES = {
-    "closed": ([".........", ".........", ".a.....a.", "..aaaaa.."],
-               ["...........", ".a.......a.", "..aaaaaaa.."]),
-    "happy": ([".........", "..aaaaa..", ".a.....a.", "........."],
-              ["..aaaaaaa..", ".a.......a.", "..........."]),
-    "asleep": ([".........", ".........", ".........", ".aaaaaaa."],
-               ["...........", "...........", ".aaaaaaaaa."]),
+RIGHT_OPEN = ["......a.", "..aaaaaa", ".aaBmmaa", ".adBqmd.", "..yqqy.."]
+LEFT_EYES = {
+    "closed": [".........", ".a.....a.", "..aaaaa..", "........."],
+    "happy": [".........", "..aaaaa..", ".a.....a.", "........."],
+    "asleep": [".........", ".........", ".aaaaaaa.", "..yyyyy.."],
 }
-MOUTH_AT = (49, 41)
-MOUTH_SKIN = ["AAAAAAAA", "AAAAAAAA", "AAAAAAAA", "AAAAAAAA"]
+RIGHT_EYES = {
+    "closed": ["........", "........", "a......a", ".aaaaaa."],
+    "happy": ["........", ".aaaaaa.", "a......a", "........"],
+    "asleep": ["........", "........", "........", "aaaaaaaa"],
+}
+MOUTHS = {
+    "smile": ["..........", "..........", ".k......k.", "..kkkkkk..", "..........", ".........."],
+    "sleepy": ["..........", "..........", "..........", "....kk....", "..........", ".........."],
+}
 
 
-def eyes(img, right=None, left=None):
-    if right:
-        img = patch(img, *RIGHT_EYE, rows=RIGHT_SKIN)
-        img = patch(img, *RIGHT_EYE, rows=right)
-    if left:
+def eyes(img, left=None, right=None):
+    if left is not None:
         img = patch(img, *LEFT_EYE, rows=LEFT_SKIN)
         img = patch(img, *LEFT_EYE, rows=left)
+    if right is not None:
+        img = patch(img, RIGHT_EYE[0], RIGHT_EYE[1], rows=RIGHT_SKIN)
+        img = patch(img, *RIGHT_EYE, rows=right)
     return img
 
 
+def mouth(img, name):
+    img = patch(img, *MOUTH_AT, rows=MOUTH_SKIN)
+    return patch(img, *MOUTH_AT, rows=MOUTHS[name])
+
+
+def face_normal(base):
+    """Both eyes open (the drawing winks) and a smile."""
+    return mouth(eyes(base, right=RIGHT_OPEN), "smile")
+
+
 def face_blink(base):
-    right, left = EYES["closed"]
-    return eyes(base, right, left)
+    return mouth(eyes(base, LEFT_EYES["closed"], RIGHT_EYES["closed"]), "smile")
 
 
 def face_look(base):
-    """A glint runs over her glasses."""
-    img = patch(base, 60, 27, ["..C", ".C.", "C.."])
-    return patch(img, 44, 33, [".C", "C."])
-
-
-def face_hover(base):
-    """A wink with the right eye."""
-    right, _ = EYES["happy"]
-    return patch(eyes(base, right=right), 60, 35, ["pp"])
+    """Both eyes open with the laugh from the drawing."""
+    return eyes(base, right=RIGHT_OPEN)
 
 
 def face_happy(base):
-    right, left = EYES["happy"]
-    img = eyes(base, right, left)
-    img = patch(img, 60, 35, ["pp"])
-    return patch(img, 40, 40, ["pp"])
+    img = eyes(base, LEFT_EYES["happy"], RIGHT_EYES["happy"])
+    img = patch(img, 41, 41, ["pp"])
+    return patch(img, 57, 35, ["pp"])
 
 
 def face_sleep(base):
-    right, left = EYES["asleep"]
-    img = eyes(base, right, left)
-    img = patch(img, *MOUTH_AT, rows=MOUTH_SKIN)
-    return patch(img, *MOUTH_AT, rows=["........", "..mmm...", "........", "........"])
+    return mouth(eyes(base, LEFT_EYES["asleep"], RIGHT_EYES["asleep"]), "sleepy")
 
 
 # ----------------------------------------------------------------- animation
@@ -192,9 +207,9 @@ def shift_span(src, dst, y, a, b, s, side):
 
 
 def hair_wave(img, phase):
-    """The hair tips sway: on the left below the tablet, on the right below the head."""
+    """The hair tips sway: on the left below the peace sign, on the right below the head."""
     out = img.copy()
-    for side, y_start, y_full, y_end in (("left", 96, 106, 128), ("right", 50, 64, 136)):
+    for side, y_start, y_full, y_end in (("left", 74, 86, 140), ("right", 44, 58, 140)):
         for y in range(y_start, y_end):
             amp = 1.25 * min(1.0, (y - y_start) / (y_full - y_start))
             s = math.floor(amp * math.sin(2 * math.pi * phase / PHASES - 0.16 * (y - 44)) + 0.5)
@@ -210,9 +225,28 @@ def wiggle_ahoge(img, s):
         return img
     out = img.copy()
     for y in range(0, 4):
-        seg = img[y, 34:70].copy()
-        out[y, 34:70] = 0
-        out[y, 34 + s:70 + s] = seg
+        seg = img[y, 30:84].copy()
+        out[y, 30:84] = 0
+        out[y, 30 + s:84 + s] = seg
+    return out
+
+
+PEACE = (2, 26, 45, 64)          # x from, x to, y from, y to: the fingers and palm of her peace sign
+BOB = [0, -1, -1, 0, 0, -1, -1, 0]
+
+
+def bob_peace(img, phase):
+    """Hover and click: the peace sign bobs up, bending at the wrist."""
+    s = BOB[phase]
+    if s == 0:
+        return img
+    x0, x1, y0, y1 = PEACE
+    out = img.copy()
+    block = img[y0:y1, x0:x1].copy()
+    out[y0:y1, x0:x1] = 0
+    solid = block[..., 3] > 0
+    out[y0 + s:y1 + s, x0:x1][solid] = block[solid]
+    out[y1 - 1, x0:x1] = img[y1 - 1, x0:x1]   # keep the wrist row so the arm stays attached
     return out
 
 
@@ -222,14 +256,16 @@ def to_cell(img):
 
 BREATH = [0, 0, 1, 1, 1, 1, 0, 0]
 AHOGE = [0, 0, 0, 1, 1, 0, 0, -1]
-BREATH_ROW = 92
-STRETCH_ROWS = [92, 130, 150]
+BREATH_ROW = 94
+STRETCH_ROWS = [94, 130, 150]
 
 
-def idle_frame(face, phase):
+def idle_frame(face, phase, bobbing):
     """(cell, how far everything above the waist moved up) for one idle phase."""
     img = hair_wave(face, phase)
     img = wiggle_ahoge(img, AHOGE[phase])
+    if bobbing:
+        img = bob_peace(img, phase)
     lift = BREATH[phase]
     return to_cell(kit.restretch(img, dup=[BREATH_ROW] if lift else [])), lift
 
@@ -271,19 +307,19 @@ def xai_logo(w, h, shirt, ink=(236, 236, 238), ss=24):
     return img
 
 
-LOGO_AT = (49, 67)   # top-left in base coordinates, where "grok" was
-LOGO = xai_logo(12, 13, (46, 45, 44))
+LOGO_AT = (48, 66)   # top-left in base coordinates, where "grok" was
+SHIRT = (41, 39, 42)
 
 
-def with_logo(cell, lift, mirrored):
+def with_logo(cell, lift, mirrored, logo):
     """Paints the logo onto a finished cell; mirrored cells get it unmirrored, so it never reads backwards."""
     x = BASE_X + LOGO_AT[0]
     if mirrored:
-        x = FRAME_W - x - LOGO.shape[1]
+        x = FRAME_W - x - logo.shape[1]
     y = BASE_Y + LOGO_AT[1] - lift
     out = cell.copy()
-    solid = LOGO[..., 3] > 0
-    out[y:y + LOGO.shape[0], x:x + LOGO.shape[1]][solid] = LOGO[solid]
+    solid = logo[..., 3] > 0
+    out[y:y + logo.shape[0], x:x + logo.shape[1]][solid] = logo[solid]
     return out
 
 
@@ -325,7 +361,7 @@ def effects():
 
 
 def spinner_frames():
-    """A terminal spinner: | / - \\ turning."""
+    """A terminal spinner: a line turning through | / - and back-slash."""
     shapes = [
         ["...o...", "...o...", "...o...", "...o...", "...o...", "...o...", "...o..."],
         ["......o", ".....o.", "....o..", "...o...", "..o....", ".o.....", "o......"],
@@ -336,7 +372,7 @@ def spinner_frames():
 
 
 def bubble_contents():
-    """An xAI-style X with a cursor (hover), | / - \\ spinner, '?' and check."""
+    """An xAI-style X with a cursor (hover), turning-line spinner, '?' and check."""
     o = {"o": INK, "c": CURSOR}
     prompt = ["oo...oo.....", ".oo.oo......", "..ooo.......", "..ooo.......", ".oo.oo......", "oo...oo.cccc", "o.....o.cccc"]
     contents = {
@@ -364,27 +400,28 @@ def build():
     base = base_sprite()
     print("base sprite", base.shape[1], "x", base.shape[0])
     assert base.shape[1] + 2 * BASE_X <= FRAME_W and base.shape[0] + BASE_Y <= FRAME_H
-    base = take_off_watch(base)
+    shirt = tuple(int(c) for c in base[LOGO_AT[1] + 6, LOGO_AT[0] + 6, :3])
+    logo = xai_logo(12, 13, shirt)
 
-    faces = {"normal": base, "blink": face_blink(base), "look": face_look(base),
-             "hover": face_hover(base), "happy": face_happy(base), "sleep": face_sleep(base)}
+    faces = {"normal": face_normal(base), "blink": face_blink(base), "look": face_look(base),
+             "hover": base, "happy": face_happy(base), "sleep": face_sleep(base)}
     cells = {}
     for name, img in faces.items():
         for p in range(PHASES):
-            cells["%s_%d" % (name, p)] = idle_frame(img, p)
+            cells["%s_%d" % (name, p)] = idle_frame(img, p, name in ("hover", "happy"))
     for n in (-2, -1, 1, 2, 3):
         cells["bounce_%d" % n] = bounce_frame(faces["happy"], n)
     frames = {}
     for name, (cell, lift) in cells.items():
-        frames[name] = with_logo(cell, lift, False)
+        frames[name] = with_logo(cell, lift, False, logo)
     for name, (cell, lift) in cells.items():
-        frames["m_" + name] = with_logo(cell[:, ::-1].copy(), lift, True)
+        frames["m_" + name] = with_logo(cell[:, ::-1].copy(), lift, True, logo)
 
     sprites, sprite_tips = effects()
     # anchors in cell coordinates of the unmirrored frames; she looks to the left
-    logo_center = (BASE_X + LOGO_AT[0] + LOGO.shape[1] // 2, BASE_Y + LOGO_AT[1] + LOGO.shape[0] // 2)
-    anchors = {"bubble": (BASE_X + 34, BASE_Y + 10), "zzz": (BASE_X + 44, BASE_Y + 6),
-               "logo": logo_center, "head": (BASE_X + 54, BASE_Y + 30)}
+    logo_center = (BASE_X + LOGO_AT[0] + logo.shape[1] // 2, BASE_Y + LOGO_AT[1] + logo.shape[0] // 2)
+    anchors = {"bubble": (BASE_X + 32, BASE_Y + 10), "zzz": (BASE_X + 44, BASE_Y + 6),
+               "logo": logo_center, "head": (BASE_X + 50, BASE_Y + 30)}
     extra = [
         "facing left",
         "anim twinkle star1 star1 star2 star2 star1 spark0",
@@ -392,21 +429,20 @@ def build():
         "anim spin " + " ".join("spin%d" % f for f in range(8)),
     ]
     kit.write_atlas(SPRITES, frames, sprites, sprite_tips, anchors, (FRAME_W, FRAME_H), extra)
-    kit.make_icon(base[0:54, 30:84], SPRITES / "icon.ico")
+    kit.make_icon(faces["normal"][0:54, 26:80], SPRITES / "icon.ico")
     previews(faces, frames, sprites)
 
 
 def previews(faces, frames, sprites):
     PREVIEW.mkdir(exist_ok=True)
     light = (170, 180, 195)
-    face_box = (32, 20, 72, 52)
+    face_box = (30, 20, 70, 52)
     tiles = [kit.on_bg(f[face_box[1]:face_box[3], face_box[0]:face_box[2]], light, 8) for f in faces.values()]
     kit.strip(tiles).save(PREVIEW / "faces.png")
     kit.strip([kit.on_bg(frames["normal_%d" % p], light, 2) for p in range(PHASES)]).save(PREVIEW / "idle.png")
-    kit.strip([kit.on_bg(frames[n], light, 2) for n in ("bounce_-2", "bounce_-1", "happy_0", "bounce_1", "bounce_2", "bounce_3", "m_normal_0", "m_happy_0")]).save(PREVIEW / "bounce.png")
+    kit.strip([kit.on_bg(frames["hover_%d" % p], light, 2) for p in range(4)]
+              + [kit.on_bg(frames[n], light, 2) for n in ("bounce_-2", "bounce_3", "m_normal_0", "m_happy_0")]).save(PREVIEW / "bounce.png")
     kit.strip([kit.on_bg(s, (200, 205, 210), 8) for s in sprites.values()], bg=(90, 90, 90)).save(PREVIEW / "fx.png")
-    wrist = kit.on_bg(frames["normal_0"][BASE_Y + 100:BASE_Y + 125, BASE_X + 64:BASE_X + 104], light, 10)
-    wrist.save(PREVIEW / "wrist.png")
 
 
 if __name__ == "__main__":

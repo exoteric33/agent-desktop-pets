@@ -25,9 +25,11 @@ Pixel-Art-Desktop-Pets für Windows, eins pro KI-Agent. Ein Tray-Programm (`aipe
 | `hermes` | Hermes-chan | `Desktop\hermes-chan.jpg` | Programm `hermes --yolo` in PowerShell | hermes-agent.nousresearch.com | Hermes-Shell-Hooks | sitzt, nur Gesicht animiert, Musiknoten |
 | `astra` | Astra (Codex) | `Desktop\astra.png` | Programm `codex --dangerously-bypass-approvals-and-sandbox` | chatgpt.com/codex | Codex-Hooks | OpenAI-Logo statt „ASTRA 6“, funkelnde Haarsterne, Katzenohren |
 | `gemini` | Gemini | ins Chat eingefügtes Bild (nur im Repo) | Website gemini.google.com/app | `gemini` (CLI nicht installiert) | – | Google-„G“ statt „3.8 Flash“, gezeichnete Augen, winkt |
-| `grok` | Grok | `Desktop\grok-chan.png` | Website grok.com | `grok` (CLI nicht installiert) | – | xAI-Logo statt „grok“ (User-Wahl), Uhr entfernt (User-Wunsch), Brille, zwinkert |
+| `grok` | Grok | `Desktop\grok-chan-pixel-ohne-tablet.png` | Website grok.com | `grok` (CLI nicht installiert) | – | xAI-Logo statt „grok“ (User-Wahl), zwinkert beim Hover wie im Bild, Peace-Zeichen wippt |
 
-Commits auf `main`: ClaudePet → aipets (Tray, Hermes) → Astra/Codex-Hooks → Gemini/Link-Pets → Grok und Programm/Website-Auswahl für alle.
+Commits auf `main`: ClaudePet → aipets (Tray, Hermes) → Astra/Codex-Hooks → Gemini/Link-Pets → Grok und Programm/Website-Auswahl für alle → neues Grok-Aussehen.
+
+Grok hatte zuerst eine andere Vorlage (`Desktop\grok-chan.png`: Brille, Tablet, Uhr). Der User hat danach nur das Aussehen durch `grok-chan-pixel-ohne-tablet.png` ersetzen lassen; alles andere (Link, Logo-Wahl, Effekte) blieb.
 
 ## 3. Befehle
 

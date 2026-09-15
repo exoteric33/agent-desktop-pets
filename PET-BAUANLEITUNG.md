@@ -31,7 +31,7 @@ Der Einstieg für Agents (Arbeitsweise, Stand, lokale Einrichtung) steht in [AGE
 | Hermes | nur Gesicht: Blinzeln, Aufschauen, Lächeln, glücklich, schlafen; Musiknoten aus dem Kopfhörer | Programm: `wt → powershell -NoExit → hermes --yolo` | `https://hermes-agent.nousresearch.com/` | Hermes-Shell-Hooks |
 | Astra | Atmen, wehende Haare, funkelnde Sterne in den Galaxie-Strähnen, Ahoge, Katzenohren stellen sich auf, Blinzeln, Aufschauen, „:3“, glücklich, schlafen, Hüpfer; OpenAI-Logo auf dem Shirt | Programm: `wt → cmd /c codex.cmd --dangerously-bypass-approvals-and-sandbox` | `https://chatgpt.com/codex` | Codex-Hooks |
 | Gemini | Atmen, wehende Haare, Ahoge, Blinzeln, Aufschauen, glücklich mit Zunge wie im Bild, schlafen, Hüpfer; winkt beim Hover und Klick; Google-„G“ auf dem Shirt | Website: `https://gemini.google.com/app` | Programm `gemini` (Gemini CLI, nicht installiert) | – |
-| Grok | Atmen, wehende Haarspitzen, Ahoge, Blinzeln, Brillenglanz, zwinkert beim Hover, glücklich, schlafen, Hüpfer; xAI-Logo auf dem Shirt, Uhr entfernt | Website: `https://grok.com/` | Programm `grok` (nicht installiert) | – |
+| Grok | Atmen, wehende Haarspitzen, Ahoge, Blinzeln, lacht beim Aufschauen, zwinkert beim Hover wie im Bild, Peace-Zeichen wippt bei Hover und Klick, glücklich, schlafen, Hüpfer; xAI-Logo auf dem Shirt | Website: `https://grok.com/` | Programm `grok` (nicht installiert) | – |
 
 ## 2. Ordner
 
@@ -125,7 +125,9 @@ home=88                                      ; Abstand zum rechten Bildschirmran
    - Hermes: grauen Bodenschatten wegfluten und weiße Randlichter in Haaren und Stiefeln schwarz malen. Beim Verkleinern würden sie zu Pünktchen.
    - Astra: dieselbe Vorlage wie Claude (Shirt-Schriftzug „ASTRA 6“, Ärmeltext, Wasserzeichen). Schrift wird mit Weiß zugeflossen, das Wasserzeichen auf dem Rock bekommt das glatte Lila (Zufließen würde die Faltenlinien hineinziehen).
    - Gemini: Der Hintergrund ist leicht verrauschtes Off-White (Referenz 250, Toleranz 12), dazu zwei `pockets` zwischen Haarsträhnen. Den Schriftzug „3.8 Flash“ (blaue Ziffern, dunkle Buchstaben) findet die Maske über Helligkeit *oder* Sättigung.
-   - Grok: Den weißen Schriftzug „grok“ auf dem schwarzen Shirt nicht zufließen lassen: Das zieht den dunklen Rand der Buchstaben mit und hinterlässt ein „grok“-Schattenbild. Stattdessen den Kasten flach mit dem Median-Schwarz der Zeilen darüber und darunter füllen.
+   - Grok (Vorlage `grok-chan-pixel-ohne-tablet.png`, 1024×900): Das Bild ist nur im Pixel-Stil gezeichnet, ohne sauberes Raster, und läuft deshalb durch die normale Pipeline.
+     - Ihre Locken schließen viele Hintergrundlücken ein. Jede reinweiße Fläche (≥ 12 px) außerhalb von `KEEP_WHITE` (weiße Strähne, Gesicht, Schriftzug, Haarspange) wird als Loch entfernt.
+     - Den weißen Schriftzug „grok“ auf dem schwarzen Shirt nicht zufließen lassen: Das zieht den dunklen Rand der Buchstaben mit und hinterlässt ein „grok“-Schattenbild. Stattdessen den Kasten flach mit dem Median-Schwarz der Zeilen darüber und darunter füllen.
 2. **`kit.pixelise(rgb, fg, factor, palette, outline, outline_bottom)`:**
    - Blöcke verkleinern. Dünne dunkle Linien bleiben erhalten: Hat ein Block genug dunkle Pixel, bekommt er deren Farbe.
    - Palette per k-means (Lab), einzelne Pixel glätten, 1 px Außenlinie.
@@ -134,7 +136,7 @@ home=88                                      ; Abstand zum rechten Bildschirmran
    - **Maßstab zwischen den Pets:** Die Köpfe sollen etwa gleich groß sein (Astra: 46 px vom Haaransatz bis Kinn). Deshalb wird die Vorlage vor dem Faktor 3 skaliert (`ENLARGE`):
      - Astra: 252×304, `ENLARGE` 1,2, 28 Farben.
      - Gemini: 229×257, `ENLARGE` 1,5, 32 Farben für den Haarverlauf von Blau über Pink zu Lila.
-     - Grok: 548×704, `ENLARGE` 0,7 (verkleinern), 28 Farben. Damit ist sie etwa so groß wie Hermes (115×163).
+     - Grok: 1024×900, `ENLARGE` 0,55 (verkleinern), 28 Farben. Damit ist sie etwa so groß wie Hermes (118×162).
    - Vorher Varianten nebeneinander mit den fertigen Pets vergleichen (Atlas-Frame `normal_0` der anderen daneben legen).
 3. **Handarbeit** mit `kit.patch(img, x, y, rows, colors)` (Zeichen → Farbe, `.` = unverändert). Was die Verkleinerung zerstört, wird neu gesetzt: Claude-Sternchen, Hermes-Kopfhörer und „N“-Halsband.
    - **Logos statt Schriftzug** (Wunsch des Users): immer aus dem echten Vektorlogo rastern, nie freihändig.
@@ -143,13 +145,15 @@ home=88                                      ; Abstand zum rechten Bildschirmran
      - Grok, xAI-Zeichen (vom User statt „grok“ gewählt): vier Polygone, 12×13 px, hell auf Schwarz, Randpixel zu 55 % gemischt.
      - Vorgehen: Größen 11–13 px mit 1–3 Tinten direkt auf dem Shirt bei 2× und 4× vergleichen, dann wählen.
    - Gemini: goldene Brosche und die Haarspange als vierfarbiger Stern.
-   - Grok: **Uhr entfernt** (Wunsch des Users). Haut über Gehäuse und Armband, die Handgelenk-Kontur läuft als `m`-Linie durch (`take_off_watch`).
+   - Grok: Das xAI-Logo sitzt dort, wo „grok“ stand. Die Farbe fürs Mischen der Randpixel wird aus dem fertigen Basis-Sprite gelesen.
 4. **Gesichter:** Die Pipeline zerstört Augen und Mund praktisch immer, sie werden als Patches gezeichnet.
    - Koordinaten findest du über einen Symbol-Dump des Basis-Sprites plus Grid-Zoom mit Koordinatenlinien (großer Zoom, Beschriftung alle 2 px).
    - Umrechnung Vorlage → Basis-Sprite: `x = (ENLARGE·x_src − x0)/3 + 1`, `y` genauso. `x0`/`y0` ist der Rand der erodierten Maske im skalierten Bild.
    - Faces-Vorschau in `preview\faces.png`.
    - Gemini hat in der Vorlage die Augen zu: Augen und Mund werden erst mit Haut übermalt, dann offene Augen gezeichnet. Ihr Kopf ist geneigt, das rechte Auge sitzt 3 px höher. „happy“ ist das „^^“ mit Zunge aus dem Bild.
-   - Grok trägt eine Brille: Die Brillenränder bleiben stehen, übermalt wird nur das Auge darunter (rechts x 53–61, y 29–32; links x 37–47, y 35–37). „look“ ist ein Glanz auf den Gläsern, „hover“ ein Zwinkern mit dem rechten Auge.
+   - Grok zwinkert in der Vorlage mit offenem Mund. Das Bild selbst ist deshalb „hover“.
+     - „normal“ bekommt ein gezeichnetes offenes rechtes Auge (x 54–61, y 30–34) und ein Lächeln. „look“ hat beide Augen offen und das Lachen aus dem Bild.
+     - Geschlossene Augen links nur über x 38–44 malen: Die Randspalten gehören zu Haar und Wimpernspitze.
 5. **Animation** (bildspezifisch):
    - **Claude:** 8 Phasen je Gesicht (`hair_wave`, `wiggle_ahoge`, `restretch` fürs Atmen) plus `bounce_-2..3`.
    - **Hermes:** 1 Phase je Gesicht, keine Bounce-Frames, die Bewegung steckt nur im Gesicht.
@@ -160,8 +164,9 @@ home=88                                      ; Abstand zum rechten Bildschirmran
      - Links wehen die Haare erst unterhalb des erhobenen Arms, sonst würde der Arm mitwackeln.
    - **Grok:** wie Claude 8 Phasen je Gesicht plus `bounce_-2..3`.
      - Shirt und Rock sind so schwarz wie ihr Haar, Farbe hilft also nicht. `hair_span` hat deshalb eine Reichweite (9 px vom Außenrand): Es wehen nur die Haarspitzen.
-     - Links erst unterhalb des Tablets, sonst würde das Tablet mitwackeln.
-     - Gesichter: normal, blink, look (Brillenglanz), hover (Zwinkern), happy, sleep.
+     - Links erst unterhalb des Peace-Zeichens, sonst würde die Hand mitwackeln.
+     - `bob_peace` hebt Finger und Handfläche bei hover und happy um 1 px an (Knick am Handgelenk).
+     - Gesichter: normal, blink, look (Lachen), hover (Zwinkern aus dem Bild), happy, sleep.
 6. **`mirror`:** alle Frames gespiegelt (`m_…`). Logos werden zurückgedreht (Claudes Haarspange, Hermes' „N“).
    - Astra, Gemini, Grok: Das Logo kommt erst auf die fertige (ggf. gespiegelte) Zelle, mit dem Versatz aus Atmen und Hüpfer (`with_logo`/`with_logos`). Ein fester Ausschnitt würde bei Frames mit verdoppelten Zeilen danebenliegen.
    - Versatz: Verdoppelte Zeilen *unterhalb* des Logos schieben es nach oben, gelöschte nach unten. Zeilen darüber verschieben nichts (die Zelle ist unten ausgerichtet).
@@ -287,7 +292,7 @@ anim <name> <sprite> <sprite> …           # optional: burst, twinkle*, z, spin
    - Claude = Körperanimation.
    - Astra = Funkeln, Ohren, Logo nach dem Spiegeln.
    - Gemini = gezeichnete Augen, Winken, farbiges SVG-Logo.
-   - Grok = Brille, Uhr entfernt, einfarbiges Polygon-Logo, dunkle Kleidung.
+   - Grok = Hintergrundlücken in Locken, Zwinkern als Vorlage, wippende Hand, einfarbiges Polygon-Logo, dunkle Kleidung.
 2. Bild nach `art\source.*`. Am besten eine freigestellte Figur auf einfarbigem Hintergrund, groß genug fürs Gesicht (nach dem Verkleinern ≥ 20 px Gesichtsbreite).
 3. **Bildspezifisches** anpassen: Freistellen, `ENLARGE`/`FACTOR`, Details, Gesichts-Patches, Animation, Logo, `anchors`, Icon-Ausschnitt.
    - **Vorgehen:** erst nur pixelisieren und neben die anderen Pets legen, dann Symbol-Dump und Grid-Zoom anschauen, dann die Koordinaten eintragen.
