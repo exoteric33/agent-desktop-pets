@@ -14,7 +14,14 @@ namespace AiPets
         public string Id, Dir, Name, OpenText;
         public int Order, Home;
         public string Program, Find, Args, Shell;
+        public string Url;      // a website instead of a program (Gemini); "" for program pets
         public string Status;   // "claude", "hermes", "codex" or "" — which hook source the pet shows
+
+        /// <summary>The pet opens a link in the browser instead of starting a program.</summary>
+        public bool IsLink
+        {
+            get { return Url.Length > 0; }
+        }
 
         public string SpritesDir
         {
@@ -79,6 +86,7 @@ namespace AiPets
             pet.Find = ini.Get("pet", "find") ?? "";
             pet.Args = ini.Get("pet", "args") ?? "";
             pet.Shell = ini.Get("pet", "shell") ?? "direct";
+            pet.Url = ini.Get("pet", "url") ?? "";
             pet.Status = ini.Get("pet", "status") ?? "";
             return pet;
         }
@@ -91,7 +99,7 @@ namespace AiPets
         public int Scale;           // 0 = pick from display DPI
         public bool HasPosition;
         public int X, Y;            // bottom-centre of the pet in screen pixels
-        public string WorkDir, Program, Args, Shell;
+        public string WorkDir, Program, Args, Shell, Url;
 
         public static PetSettings From(PetInfo pet, Ini ini)
         {
@@ -108,6 +116,7 @@ namespace AiPets
             s.Program = ini.Get(id, "program") ?? pet.Program;
             s.Args = ini.Get(id, "args") ?? pet.Args;
             s.Shell = ini.Get(id, "shell") ?? pet.Shell;
+            s.Url = ini.Get(id, "url") ?? pet.Url;
             return s;
         }
 

@@ -5,7 +5,7 @@ using System.IO;
 
 namespace AiPets
 {
-    /// <summary>Opens a pet's program in a new Windows Terminal window (plain console as fallback).</summary>
+    /// <summary>Opens a pet's program in a new Windows Terminal window (plain console as fallback), or its link in the browser.</summary>
     static class Launcher
     {
         public static bool DryRun;
@@ -13,18 +13,29 @@ namespace AiPets
         public static void Launch(PetInfo pet, PetSettings s)
         {
             ProcessStartInfo psi = BuildStartInfo(pet, s);
+            // a shell-execute start must never touch EnvironmentVariables: that alone makes Process.Start throw
             Log.Write((DryRun ? "dry-run: " : "launch: ") + psi.FileName + " " + psi.Arguments
-                + (psi.EnvironmentVariables.ContainsKey("CLAUDECODE") ? "  [inherited env!]" : ""));
+                + (!psi.UseShellExecute && psi.EnvironmentVariables.ContainsKey("CLAUDECODE") ? "  [inherited env!]" : ""));
             if (!DryRun)
-                Process.Start(psi).Dispose();
+                using (Process.Start(psi)) { }   // null when the browser was already running
         }
 
         /// <summary>
         /// shell=direct: the terminal runs the program itself (tab closes when it exits);
         /// shell=powershell / cmd: the program runs inside that shell, which stays open afterwards.
+        /// A link pet (url=) opens its link in the default browser.
         /// </summary>
         public static ProcessStartInfo BuildStartInfo(PetInfo pet, PetSettings s)
         {
+            if (pet.IsLink)
+            {
+                string url = NormalizeUrl(s.Url);
+                if (url == null)
+                    throw new UriFormatException(pet.Name + ": \"" + s.Url + "\" ist kein Link.\n\n"
+                        + "Trag in den Einstellungen einen Link mit http:// oder https:// ein.");
+                return new ProcessStartInfo(url) { UseShellExecute = true };
+            }
+
             // wt hands the caller's environment to the new tab, so start from a clean
             // logon environment (also picks up PATH changes made while the pet runs)
             Dictionary<string, string> env = Native.LogonEnvironment();
@@ -101,6 +112,19 @@ namespace AiPets
                     return found;
             }
             return null;
+        }
+
+        /// <summary>An absolute http(s) link from what was typed ("gemini.google.com" gets https://), or null.</summary>
+        public static string NormalizeUrl(string text)
+        {
+            text = (text ?? "").Trim();
+            if (text.Length > 0 && text.IndexOf("://", StringComparison.Ordinal) < 0)
+                text = "https://" + text;
+            Uri uri;
+            if (!Uri.TryCreate(text, UriKind.Absolute, out uri) || uri.Host.Length == 0
+                || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+                return null;
+            return uri.AbsoluteUri;
         }
 
         static bool IsBatch(string file)

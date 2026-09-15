@@ -12,7 +12,7 @@ namespace AiPets
     /// aipets.exe                          tray (starts and watches the pets)
     /// aipets.exe --pet &lt;id&gt; [--host pid]   one pet window
     /// aipets.exe --hook &lt;source&gt; &lt;event&gt;  agent hook: record the state and exit
-    /// aipets.exe --snapshot &lt;dir&gt; [--pet id]  render pets and settings window into PNGs
+    /// aipets.exe --snapshot &lt;dir&gt; [--pet id]  render pets and settings window (that pet's page) into PNGs
     /// aipets.exe --status &lt;source&gt;        print the folded agent state (diagnostics)
     /// aipets.exe --command &lt;id&gt;           print what a click on the pet would start (diagnostics)
     /// --dry-run: clicks only log what they would start
@@ -53,7 +53,9 @@ namespace AiPets
             {
                 PetInfo info = PetInfo.ById(command);
                 ProcessStartInfo psi = Launcher.BuildStartInfo(info, PetSettings.From(info, Store.Load()));
-                Console.WriteLine(psi.FileName + " " + psi.Arguments + "\n(in " + psi.WorkingDirectory + ")");
+                Console.WriteLine(psi.UseShellExecute
+                    ? psi.FileName + "\n(im Standardbrowser)"
+                    : psi.FileName + " " + psi.Arguments + "\n(in " + psi.WorkingDirectory + ")");
                 return 0;
             }
 
@@ -67,7 +69,7 @@ namespace AiPets
                 foreach (PetInfo pet in PetInfo.Discover())
                     if (petId == null || pet.Id == petId)
                         PetForm.Snapshot(pet, snapshot);
-                SettingsForm.Snapshot(Path.Combine(snapshot, "settings.png"));
+                SettingsForm.Snapshot(Path.Combine(snapshot, "settings.png"), petId);
                 return 0;
             }
 

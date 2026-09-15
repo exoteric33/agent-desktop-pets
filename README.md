@@ -7,6 +7,7 @@ Pixel-Art-Desktop-Pets für Windows, eins pro KI-Agent. Die Pets sitzen auf der 
 | **Claude** | Claude Code im Windows Terminal | Claude-Code-Hooks |
 | **Hermes** | Hermes Agent in PowerShell (im Windows Terminal) | Hermes-Shell-Hooks |
 | **Astra** | Codex CLI im Windows Terminal | Codex-Hooks |
+| **Gemini** | Google Gemini (gemini.google.com) im Standardbrowser | – |
 
 ## Schnellstart
 
@@ -14,7 +15,7 @@ Pixel-Art-Desktop-Pets für Windows, eins pro KI-Agent. Die Pets sitzen auf der 
    `.\build.ps1 -Art` erzeugt vorher App-Icon und Sprites neu. Dafür brauchst du Python mit `numpy` und `Pillow`.
 2. **Starten:** `aipets.exe` doppelklicken. Die exe muss neben dem Ordner `pets\` liegen.
    Im Infobereich der Taskleiste (bei den ausgeblendeten Symbolen hinter `^`) erscheint das aipets-Icon:
-   - **Linksklick:** Einstellungen. Dort kannst du Pets ein- und ausblenden und Größe, Programm, Argumente, Terminal und Arbeitsordner einstellen. Unten schaltest du „Mit Windows starten“ ein.
+   - **Linksklick:** Einstellungen. Dort kannst du Pets ein- und ausblenden und Größe, Programm, Argumente, Terminal und Arbeitsordner einstellen, bei Gemini stattdessen den Link. Unten schaltest du „Mit Windows starten“ ein.
    - **Rechtsklick:** Menü mit allen Pets, Autostart und Beenden.
 3. **Status-Anzeige:** Hooks eintragen, siehe unten.
 
@@ -22,7 +23,7 @@ Pixel-Art-Desktop-Pets für Windows, eins pro KI-Agent. Die Pets sitzen auf der 
 
 **Pet-Rechtsklick:** öffnen, Arbeitsordner, Größe, zurück in die Ecke, ausblenden, Einstellungen, aipets beenden.
 
-Ein Klick startet Claude Code mit `--dangerously-skip-permissions`, Hermes mit `--yolo` und Codex mit `--dangerously-bypass-approvals-and-sandbox`. Das kannst du in den Einstellungen oder in `pets\<id>\pet.ini` ändern.
+Ein Klick startet Claude Code mit `--dangerously-skip-permissions`, Hermes mit `--yolo` und Codex mit `--dangerously-bypass-approvals-and-sandbox`. Gemini öffnet `https://gemini.google.com/app` im Standardbrowser. Das kannst du in den Einstellungen oder in `pets\<id>\pet.ini` ändern.
 
 ## Hooks für Claude Code
 

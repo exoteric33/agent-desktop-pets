@@ -1,0 +1,151 @@
+cell 115 134
+frame normal_0 0 0
+frame normal_1 115 0
+frame normal_2 230 0
+frame normal_3 345 0
+frame normal_4 460 0
+frame normal_5 575 0
+frame normal_6 690 0
+frame normal_7 805 0
+frame blink_0 0 134
+frame blink_1 115 134
+frame blink_2 230 134
+frame blink_3 345 134
+frame blink_4 460 134
+frame blink_5 575 134
+frame blink_6 690 134
+frame blink_7 805 134
+frame look_0 0 268
+frame look_1 115 268
+frame look_2 230 268
+frame look_3 345 268
+frame look_4 460 268
+frame look_5 575 268
+frame look_6 690 268
+frame look_7 805 268
+frame hover_0 0 402
+frame hover_1 115 402
+frame hover_2 230 402
+frame hover_3 345 402
+frame hover_4 460 402
+frame hover_5 575 402
+frame hover_6 690 402
+frame hover_7 805 402
+frame happy_0 0 536
+frame happy_1 115 536
+frame happy_2 230 536
+frame happy_3 345 536
+frame happy_4 460 536
+frame happy_5 575 536
+frame happy_6 690 536
+frame happy_7 805 536
+frame sleep_0 0 670
+frame sleep_1 115 670
+frame sleep_2 230 670
+frame sleep_3 345 670
+frame sleep_4 460 670
+frame sleep_5 575 670
+frame sleep_6 690 670
+frame sleep_7 805 670
+frame bounce_-2 0 804
+frame bounce_-1 115 804
+frame bounce_1 230 804
+frame bounce_2 345 804
+frame bounce_3 460 804
+frame m_normal_0 575 804
+frame m_normal_1 690 804
+frame m_normal_2 805 804
+frame m_normal_3 0 938
+frame m_normal_4 115 938
+frame m_normal_5 230 938
+frame m_normal_6 345 938
+frame m_normal_7 460 938
+frame m_blink_0 575 938
+frame m_blink_1 690 938
+frame m_blink_2 805 938
+frame m_blink_3 0 1072
+frame m_blink_4 115 1072
+frame m_blink_5 230 1072
+frame m_blink_6 345 1072
+frame m_blink_7 460 1072
+frame m_look_0 575 1072
+frame m_look_1 690 1072
+frame m_look_2 805 1072
+frame m_look_3 0 1206
+frame m_look_4 115 1206
+frame m_look_5 230 1206
+frame m_look_6 345 1206
+frame m_look_7 460 1206
+frame m_hover_0 575 1206
+frame m_hover_1 690 1206
+frame m_hover_2 805 1206
+frame m_hover_3 0 1340
+frame m_hover_4 115 1340
+frame m_hover_5 230 1340
+frame m_hover_6 345 1340
+frame m_hover_7 460 1340
+frame m_happy_0 575 1340
+frame m_happy_1 690 1340
+frame m_happy_2 805 1340
+frame m_happy_3 0 1474
+frame m_happy_4 115 1474
+frame m_happy_5 230 1474
+frame m_happy_6 345 1474
+frame m_happy_7 460 1474
+frame m_sleep_0 575 1474
+frame m_sleep_1 690 1474
+frame m_sleep_2 805 1474
+frame m_sleep_3 0 1608
+frame m_sleep_4 115 1608
+frame m_sleep_5 230 1608
+frame m_sleep_6 345 1608
+frame m_sleep_7 460 1608
+frame m_bounce_-2 575 1608
+frame m_bounce_-1 690 1608
+frame m_bounce_1 805 1608
+frame m_bounce_2 0 1742
+frame m_bounce_3 115 1742
+sprite spark3 0 1876 7 7 3 3
+sprite spark2 8 1876 5 5 2 2
+sprite spark1 14 1876 3 3 1 1
+sprite spark0 18 1876 1 1 0 0
+sprite z2 20 1876 6 6 3 3
+sprite z1 27 1876 5 5 2 2
+sprite z0 33 1876 4 4 2 2
+sprite gem2 38 1876 6 6 3 3
+sprite gem1 45 1876 4 4 2 2
+sprite gem0 50 1876 2 2 1 1
+sprite goo2 53 1876 6 6 3 3
+sprite goo1 60 1876 4 4 2 2
+sprite bubble_r_on 65 1876 22 17 0 16
+sprite bubble_r_off 88 1876 22 17 0 16
+sprite bubble_r_spin0 111 1876 22 17 0 16
+sprite bubble_r_spin1 134 1876 22 17 0 16
+sprite bubble_r_spin2 157 1876 22 17 0 16
+sprite bubble_r_spin3 180 1876 22 17 0 16
+sprite bubble_r_spin4 203 1876 22 17 0 16
+sprite bubble_r_spin5 226 1876 22 17 0 16
+sprite bubble_r_spin6 249 1876 22 17 0 16
+sprite bubble_r_spin7 272 1876 22 17 0 16
+sprite bubble_r_wait 295 1876 22 17 0 16
+sprite bubble_r_done 318 1876 22 17 0 16
+sprite bubble_l_on 341 1876 22 17 21 16
+sprite bubble_l_off 364 1876 22 17 21 16
+sprite bubble_l_spin0 387 1876 22 17 21 16
+sprite bubble_l_spin1 410 1876 22 17 21 16
+sprite bubble_l_spin2 433 1876 22 17 21 16
+sprite bubble_l_spin3 456 1876 22 17 21 16
+sprite bubble_l_spin4 479 1876 22 17 21 16
+sprite bubble_l_spin5 502 1876 22 17 21 16
+sprite bubble_l_spin6 525 1876 22 17 21 16
+sprite bubble_l_spin7 548 1876 22 17 21 16
+sprite bubble_l_wait 571 1876 22 17 21 16
+sprite bubble_l_done 594 1876 22 17 21 16
+anchor bubble 42 16
+anchor zzz 52 12
+anchor logo 60 72
+anchor head 62 38
+facing left
+anim twinkle gem1 gem1 gem2 gem2 gem1 gem0
+anim twinkle2 goo1 goo1 goo2 goo1 gem0
+anim spin spin0 spin1 spin2 spin3 spin4 spin5 spin6 spin7

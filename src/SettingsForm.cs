@@ -28,9 +28,11 @@ namespace AiPets
         readonly Label title = new Label(), state = new Label(), hooks = new Label();
         readonly CheckBox showBox = new CheckBox(), autostartBox = new CheckBox();
         readonly RadioButton[] sizes = new RadioButton[4];
-        readonly TextBox programBox = new TextBox(), argsBox = new TextBox(), dirBox = new TextBox();
+        readonly TextBox programBox = new TextBox(), argsBox = new TextBox(), dirBox = new TextBox(), urlBox = new TextBox();
         readonly ComboBox shellBox = new ComboBox();
         readonly Button openButton = new Button(), homeButton = new Button();
+        // a program pet shows program, arguments, terminal and folder; a link pet (Gemini) only its link
+        readonly List<Control> programRows = new List<Control>(), linkRows = new List<Control>();
         PetProcess current;
         Ini shownIni;
         bool loading;
@@ -167,13 +169,30 @@ namespace AiPets
             }
 
             y += 36;
-            AddLabel(page, "Programm", y);
-            SetupBox(page, programBox, y, 330);
+            programRows.Add(AddLabel(page, "Programm", y));
+            programRows.Add(SetupBox(page, programBox, y, 330));
+            linkRows.Add(AddLabel(page, "Link", y));
+            linkRows.Add(SetupBox(page, urlBox, y, 330));
             y += 34;
-            AddLabel(page, "Argumente", y);
-            SetupBox(page, argsBox, y, 330);
+            programRows.Add(AddLabel(page, "Argumente", y));
+            programRows.Add(SetupBox(page, argsBox, y, 330));
+            linkRows.Add(AddLabel(page, "Öffnen in", y));
+            var browser = new Label { Text = "Standardbrowser", AutoSize = true, Location = new Point(140, y), ForeColor = Muted };
+            page.Controls.Add(browser);
+            linkRows.Add(browser);
+            var resetUrl = new LinkLabel { Text = "Link zurücksetzen", AutoSize = true, Location = new Point(139, y + 25), LinkColor = Accent };
+            resetUrl.LinkClicked += delegate
+            {
+                if (current == null || host == null)
+                    return;
+                host.ChangeSetting(current, "url", null);
+                ShowPet(current);
+            };
+            page.Controls.Add(resetUrl);
+            linkRows.Add(resetUrl);
             y += 34;
-            AddLabel(page, "Öffnen in", y);
+            programRows.Add(AddLabel(page, "Öffnen in", y));
+            programRows.Add(shellBox);
             shellBox.DropDownStyle = ComboBoxStyle.DropDownList;
             shellBox.Items.AddRange(ShellNames);
             shellBox.Location = new Point(140, y - 3);
@@ -195,13 +214,15 @@ namespace AiPets
                 ShowPet(current);
             };
             page.Controls.Add(reset);
+            programRows.Add(reset);
 
             y += 56;
-            AddLabel(page, "Arbeitsordner", y);
-            SetupBox(page, dirBox, y, 292);
+            programRows.Add(AddLabel(page, "Arbeitsordner", y));
+            programRows.Add(SetupBox(page, dirBox, y, 292));
             var browse = new Button { Text = "…", Location = new Point(436, y - 4), Size = new Size(34, 25) };
             browse.Click += delegate { BrowseFolder(); };
             page.Controls.Add(browse);
+            programRows.Add(browse);
 
             y += 38;
             AddLabel(page, "Statusanzeige", y);
@@ -230,12 +251,14 @@ namespace AiPets
             return page;
         }
 
-        static void AddLabel(Control page, string text, int y)
+        static Label AddLabel(Control page, string text, int y)
         {
-            page.Controls.Add(new Label { Text = text, AutoSize = true, Location = new Point(22, y), ForeColor = Color.FromArgb(40, 40, 40) });
+            var label = new Label { Text = text, AutoSize = true, Location = new Point(22, y), ForeColor = Color.FromArgb(40, 40, 40) };
+            page.Controls.Add(label);
+            return label;
         }
 
-        void SetupBox(Control page, TextBox box, int y, int width)
+        TextBox SetupBox(Control page, TextBox box, int y, int width)
         {
             box.Location = new Point(140, y - 3);
             box.Width = width;
@@ -248,6 +271,7 @@ namespace AiPets
                 e.SuppressKeyPress = true;
             };
             page.Controls.Add(box);
+            return box;
         }
 
         void DrawPetItem(object sender, DrawItemEventArgs e)
@@ -331,7 +355,12 @@ namespace AiPets
                 if (!programBox.Focused) programBox.Text = s.Program;
                 if (!argsBox.Focused) argsBox.Text = s.Args;
                 if (!dirBox.Focused) dirBox.Text = s.WorkDir;
+                if (!urlBox.Focused) urlBox.Text = s.Url;
                 shellBox.SelectedIndex = Math.Max(0, Array.IndexOf(ShellValues, s.Shell));
+                foreach (Control c in programRows)
+                    c.Visible = !p.Info.IsLink;
+                foreach (Control c in linkRows)
+                    c.Visible = p.Info.IsLink;
                 openButton.Text = p.Info.OpenText;
                 bool ok;
                 hooks.Text = HookText(p.Info, out ok);
@@ -361,13 +390,25 @@ namespace AiPets
                 return;
             PetInfo info = current.Info;
             string value = box.Text.Trim();
-            string key = box == programBox ? "program" : box == argsBox ? "args" : "workdir";
+            string key = box == programBox ? "program" : box == argsBox ? "args" : box == urlBox ? "url" : "workdir";
+            if (info.IsLink != (key == "url"))
+                return;   // the fields of the other kind of pet are hidden
             if (key == "workdir" && (value.Length == 0 || !Directory.Exists(value)))
             {
                 box.Text = host.SettingsOf(current).WorkDir;   // not a folder: back to the saved one
                 return;
             }
-            string fallback = key == "program" ? info.Program : key == "args" ? info.Args : null;
+            if (key == "url")
+            {
+                value = Launcher.NormalizeUrl(value);
+                if (value == null)
+                {
+                    box.Text = host.SettingsOf(current).Url;   // not a link: back to the saved one
+                    return;
+                }
+                box.Text = value;
+            }
+            string fallback = key == "program" ? info.Program : key == "args" ? info.Args : key == "url" ? info.Url : null;
             string stored = value == fallback ? null : value;
             if (stored != host.Settings.Get(info.Id, key))
                 host.ChangeSetting(current, key, stored);
@@ -378,6 +419,7 @@ namespace AiPets
             Commit(programBox);
             Commit(argsBox);
             Commit(dirBox);
+            Commit(urlBox);
         }
 
         void BrowseFolder()
@@ -488,8 +530,8 @@ namespace AiPets
             get { return snapshot; }
         }
 
-        /// <summary>Layout check: renders the window into a PNG from an invisible, off-screen copy.</summary>
-        public static void Snapshot(string path)
+        /// <summary>Layout check: renders the window (the page of petId, or the first pet) into a PNG from an invisible, off-screen copy.</summary>
+        public static void Snapshot(string path, string petId)
         {
             using (var form = new SettingsForm(null))
             {
@@ -499,7 +541,7 @@ namespace AiPets
                 form.StartPosition = FormStartPosition.Manual;
                 form.Location = new Point(-32000, -32000);
                 form.Show();
-                form.SelectPet(null);
+                form.SelectPet(petId);
                 Application.DoEvents();
                 using (var bmp = new Bitmap(form.Width, form.Height))
                 {

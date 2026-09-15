@@ -17,7 +17,7 @@ Sie ist auch als Kontext für Claude gedacht: „Lies `PET-BAUANLEITUNG.md` und 
 - **Pet-Fenster:**
   - Die Figur steht bzw. sitzt unten rechts auf der Taskleiste, immer im Vordergrund. Transparente Stellen lassen Klicks durch.
   - **Maus drüber:** Hover-Gesicht plus Sprechblase mit Prompt.
-  - **Klick:** Funken, Hüpfer (falls das Pet Bounce-Frames hat), dann öffnet sich der Agent im Terminal.
+  - **Klick:** Funken, Hüpfer (falls das Pet Bounce-Frames hat), dann öffnet sich der Agent im Terminal. Ein Link-Pet (Gemini) öffnet stattdessen seine Website im Standardbrowser.
   - **Ziehen:** frei verschiebbar. In Taskleistennähe rastet das Pet ein und schaut zur Bildschirmmitte (Sprites gespiegelt).
   - **Leerlauf:** Nach 1 Minute ohne Eingabe schläft das Pet ein (Zzz).
   - **Vollbild:** Bei Vollbild-Apps blendet es sich aus, bei „Desktop anzeigen“ nicht.
@@ -28,6 +28,7 @@ Sie ist auch als Kontext für Claude gedacht: „Lies `PET-BAUANLEITUNG.md` und 
 | Claude | Atmen, wehende Haare, Antenne, Blinzeln, Lächeln, Hüpfer | `wt → claude.exe --dangerously-skip-permissions` | Claude-Code-Hooks |
 | Hermes | nur Gesicht: Blinzeln, Aufschauen, Lächeln, glücklich, schlafen; Musiknoten aus dem Kopfhörer | `wt → powershell -NoExit → hermes --yolo` | Hermes-Shell-Hooks |
 | Astra | Atmen, wehende Haare, funkelnde Sterne in den Galaxie-Strähnen, Ahoge, Katzenohren stellen sich auf, Blinzeln, Aufschauen, „:3“, glücklich, schlafen, Hüpfer; OpenAI-Logo auf dem Shirt, Sterne steigen auf, während Codex arbeitet | `wt → cmd /c codex.cmd --dangerously-bypass-approvals-and-sandbox` | Codex-Hooks |
+| Gemini | Atmen, wehende Haare, Ahoge, Blinzeln, Aufschauen, glücklich mit Zunge wie im Bild, schlafen, Hüpfer; winkt mit der erhobenen Hand beim Hover und Klick; Google-„G“ auf dem Shirt, Gemini-Funkeln | Standardbrowser → `https://gemini.google.com/app` (in den Einstellungen änderbar) | – |
 
 ## 2. Ordner
 
@@ -46,7 +47,8 @@ aipets\
 │  │  ├─ art\             source.png, make_sprites.py, preview\ (nicht im Repo)
 │  │  └─ sprites\         atlas.png, atlas.txt, icon.ico  ← liest das Programm zur Laufzeit
 │  ├─ hermes\             genauso (source.jpg)
-│  └─ astra\              genauso (source.png)
+│  ├─ astra\              genauso (source.png)
+│  └─ gemini\             genauso (source.png), pet.ini mit url= statt Programm
 └─ src\
    ├─ Program.cs          Einstieg: Tray / --pet / --hook / --snapshot / --status / --command
    ├─ TrayHost.cs         Tray-Icon, Menü, Pet-Prozesse starten und neu starten, Befehle der Pets
@@ -54,7 +56,7 @@ aipets\
    ├─ PetForm.cs          Pet-Fenster, Animation, Maus, Menü, Status-Anzeige
    ├─ Pets.cs             pet.ini lesen (PetInfo), wirksame Einstellungen (PetSettings)
    ├─ Atlas.cs            atlas.png/atlas.txt laden, Frames und Sprites zeichnen
-   ├─ Launcher.cs         Klick-Aktion: Programm finden, Terminal/Shell-Befehl bauen
+   ├─ Launcher.cs         Klick-Aktion: Programm finden, Terminal/Shell-Befehl bauen, Link prüfen und im Browser öffnen
    ├─ Status.cs           Hook-Befehl (claude, hermes, codex) + Auswertung der Statusdateien
    ├─ Native.cs           Win32: Layered Window, DPI, Idle, Vollbild, Logon-Umgebung, IPC
    └─ App.cs              Pfade, settings.ini (Ini/Store), Autostart, Log
@@ -72,7 +74,7 @@ Laufzeitdaten liegen in `%APPDATA%\aipets\`:
 - **Voraussetzung Sprites:** Python mit `numpy` und `Pillow`.
 - `.\build.ps1` beendet ein laufendes aipets aus diesem Ordner, baut und startet es danach wieder (über `explorer.exe`, damit es nicht die Umgebung der Shell erbt).
 - **Testen, ohne den Desktop anzufassen:**
-  - `aipets.exe --snapshot <ordner> [--pet id]` rendert jedes Pet in allen Zuständen (idle, hover, look, sleep, click, working, waiting, done, beide Blickrichtungen) plus das Einstellungsfenster als PNG.
+  - `aipets.exe --snapshot <ordner> [--pet id]` rendert jedes Pet in allen Zuständen (idle, hover, look, sleep, click, working, waiting, done, beide Blickrichtungen) plus das Einstellungsfenster (mit `--pet` auf der Seite dieses Pets) als PNG.
   - `aipets.exe --command <id>` gibt aus, was ein Klick starten würde.
   - `aipets.exe --status <quelle>` gibt den zusammengefassten Agent-Status aus.
   - `--dry-run` (Tray oder Pet): Klicks protokollieren nur in `aipets.log`.
@@ -95,6 +97,9 @@ home=88                                      ; Abstand zum rechten Bildschirmran
 - **Einstellungen:** Die Werte hier sind Standardwerte. Was du in den Einstellungen änderst, landet in `settings.ini` und überschreibt sie. Der Link „zurücksetzen“ löscht diese Überschreibungen wieder.
 - **`shell=direct`:** Das Terminal startet das Programm selbst, der Tab schließt mit dem Programm.
 - **`shell=powershell` / `cmd`:** Das Programm läuft in dieser Shell, und die bleibt danach offen.
+- **Link statt Programm** (`url=https://…`, Gemini): Ein Klick öffnet den Link im Standardbrowser.
+  - `program`, `args`, `shell` und der Arbeitsordner entfallen, die Einstellungen zeigen nur das Feld „Link“.
+  - Es gelten nur http(s)-Links. Eingaben wie `gemini.google.com` bekommen `https://` davor, alles andere (Dateipfade, `file://`, `javascript:`) wird abgelehnt.
 - **Mehrere Pets:** Die Home-Positionen müssen sich unterscheiden, sonst sitzen die Pets übereinander.
 
 ## 5. Art-Pipeline (`art/pixelkit.py` + `pets/<id>/art/make_sprites.py`)
@@ -104,25 +109,32 @@ home=88                                      ; Abstand zum rechten Bildschirmran
    - Claude: `pockets` für eingeschlossene Hintergrundlöcher.
    - Hermes: grauen Bodenschatten wegfluten und weiße Randlichter in Haaren und Stiefeln schwarz malen. Beim Verkleinern würden sie zu Pünktchen.
    - Astra: dieselbe Vorlage wie Claude (Shirt-Schriftzug „ASTRA 6“, Ärmeltext, Wasserzeichen). Schrift wird mit Weiß zugeflossen, das Wasserzeichen auf dem Rock bekommt das glatte Lila (Zufließen würde die Faltenlinien hineinziehen).
+   - Gemini: Der Hintergrund ist leicht verrauschtes Off-White (Referenz 250, Toleranz 12), dazu zwei `pockets` zwischen Haarsträhnen. Den Schriftzug „3.8 Flash“ (blaue Ziffern, dunkle Buchstaben) findet die Maske über Helligkeit *oder* Sättigung.
 2. **`kit.pixelise(rgb, fg, factor, palette, outline, outline_bottom)`:**
    - Blöcke verkleinern. Dünne dunkle Linien bleiben erhalten: Hat ein Block genug dunkle Pixel, bekommt er deren Farbe.
    - Palette per k-means (Lab), einzelne Pixel glätten, 1 px Außenlinie.
    - `outline_bottom=False`, wenn die Figur unten abgeschnitten ist (Claude, Astra). Hermes sitzt komplett im Bild.
    - **Faktor:** Claude 3 bei 263×350 Vorlage. Hermes 6 bei 720×1280; kleiner geht nicht, sonst ist das Gesicht zu klein für Animationen.
    - Astra: 252×304 ist enger zugeschnitten als Claudes Bild. Die Vorlage wird deshalb vorher 1,2× vergrößert (`ENLARGE`), dann Faktor 3, 28 Farben. So sind Kopf und Oberkörper so groß wie bei Claude.
+   - Gemini: 229×257, `ENLARGE` 1,5, Faktor 3, 32 Farben für den Haarverlauf von Blau über Pink zu Lila. Der Maßstab ist der Kopf: so groß wie bei Astra.
 3. **Handarbeit** mit `kit.patch(img, x, y, rows, colors)` (Zeichen → Farbe, `.` = unverändert). Was die Verkleinerung zerstört, wird neu gesetzt: Claude-Sternchen, Hermes-Kopfhörer und „N“-Halsband.
    - Astras OpenAI-Logo ist aus dem Vektorlogo bei 12 px gerastert: punktsymmetrisch gemittelt, drei Tinten (voll, 62 %, 30 % auf Shirt-Weiß). Unter 12 px zerfällt der Knoten, bei 2× Anzeige liest er sich klar.
+   - Geminis Google-„G“ entsteht genauso aus den vier farbigen Pfaden des Vektorlogos (`svg_polygon` kann M, L, H, V, C, S, Z). Jedes Pixel nimmt die Farbe mit der größten Abdeckung, schwach abgedeckte Randpixel werden mit Shirt-Weiß gemischt. Dazu kommen die goldene Brosche und die Haarspange als vierfarbiger Stern.
 4. **Gesichter:** Die Pipeline zerstört Augen und Mund praktisch immer, sie werden als Patches gezeichnet.
    - Koordinaten findest du über einen Symbol-Dump des Basis-Sprites plus Grid-Zoom mit Koordinatenlinien.
    - Faces-Vorschau in `preview\faces.png`.
+   - Gemini hat in der Vorlage die Augen zu: Augen und Mund werden erst mit Haut übermalt, dann offene Augen gezeichnet. Ihr Kopf ist geneigt, das rechte Auge sitzt 3 px höher. „happy“ ist das „^^“ mit Zunge aus dem Bild.
 5. **Animation** (bildspezifisch):
    - **Claude:** 8 Phasen je Gesicht (`hair_wave`, `wiggle_ahoge`, `restretch` fürs Atmen) plus `bounce_-2..3`.
    - **Hermes:** 1 Phase je Gesicht, keine Bounce-Frames, die Bewegung steckt nur im Gesicht.
    - **Astra:** wie Claude 8 Phasen je Gesicht plus `bounce_-2..3`, dazu `twinkle_stars` (die Sterne in den Galaxie-Strähnen funkeln versetzt) und `perk_ears` für hover und happy.
      - Ihr `hair_wave` erkennt Haar an der Farbe (schwarz oder Galaxie-Blau), nicht an der Helligkeit: sonst würde der lila Rock mitwehen.
      - Gesichter: normal, blink, look, hover („:3“), happy, sleep.
+   - **Gemini:** wie Claude 8 Phasen je Gesicht plus `bounce_-2..3`. `wave_hand` lässt die erhobene Hand bei hover und happy auf- und abwinken; im Leerlauf winkt sie nicht, das wäre auf dem Desktop zu unruhig.
+     - Links wehen die Haare erst unterhalb des erhobenen Arms, sonst würde der Arm mitwackeln.
 6. **`mirror`:** alle Frames gespiegelt (`m_…`). Logos werden zurückgedreht (Claudes Haarspange, Hermes' „N“).
    - Astra: Das Logo kommt erst auf die fertige (ggf. gespiegelte) Zelle, mit dem Versatz aus Atmen und Hüpfer (`with_logo`). Ein fester Ausschnitt würde bei Frames mit verdoppelten Zeilen danebenliegen.
+   - Gemini: genauso für das „G“ und die Haarspange (`with_logos`).
 7. **Effekte:** Funken, Zzz, Musiknoten und die Sprechblasen über `kit.bubbles(contents, outline, fill)`. `contents` sagt, was die Blase zeigen kann: `on`/`off` (Prompt mit blinkendem Cursor), `spin*`, `wait`, `done`.
 8. **Ausgabe:** `kit.write_atlas(...)` → `sprites/atlas.png` + `atlas.txt`, `kit.make_icon(head, …)` → `icon.ico` (BMP-Einträge!), Vorschaubilder.
 
@@ -236,7 +248,7 @@ anim <name> <sprite> <sprite> …           # optional: burst, twinkle*, z, spin
 2. Bild nach `art\source.*`. Am besten eine freigestellte Figur auf einfarbigem Hintergrund, groß genug fürs Gesicht (nach dem Verkleinern ≥ 20 px Gesichtsbreite).
 3. **Bildspezifisches** anpassen: Freistellen, `FACTOR`, Details, Gesichts-Patches, Animation, `mirror`-Region, `anchors`, Icon-Ausschnitt.
    - **Vorgehen:** erst nur pixelisieren, Symbol-Dump und Grid-Zoom anschauen, dann die Koordinaten eintragen.
-4. `pet.ini` schreiben (Befehl, `shell`, `status`, `home` ≠ andere Pets).
+4. `pet.ini` schreiben (Befehl, `shell`, `status` oder `url=` für eine Website, `home` ≠ andere Pets).
 5. `.\build.ps1 -Art -Pet <id>`, dann `aipets.exe --snapshot <ordner> --pet <id>` und die PNGs anschauen.
 6. `aipets.exe --command <id>` prüfen. Einmal echt klicken, wenn der Befehl stimmt.
 7. Für den Status die Hooks des Agents eintragen und mit `--status <quelle>` prüfen.
@@ -255,6 +267,7 @@ anim <name> <sprite> <sprite> …           # optional: burst, twinkle*, z, spin
 - **YAML:** Windows-Pfade in `config.yaml` nur in einfachen Anführungszeichen. In doppelten ist `\U…` ein Escape.
 - **Codex-Hooks laufen in Windows PowerShell 5.1**, nicht direkt: GUI-exe nur mit `| Out-Null` aufrufen (siehe Abschnitt 7). Ein Exit-Code aus einem inneren Aufruf kommt nur mit `; exit $LASTEXITCODE` bei Codex an.
 - **Codex zum Testen ohne Spuren:** `codex exec --ephemeral --ignore-user-config --dangerously-bypass-hook-trust -c "hooks.<Event>=[{hooks=[{type=…,command=…}]}]"`. Ein zusätzlicher UserPromptSubmit-Hook mit `exit 2` blockt den Prompt, dann gibt es keinen Modellaufruf.
+- **Link öffnen:** `ProcessStartInfo` mit `UseShellExecute = true` darf nie `EnvironmentVariables` anfassen, auch nicht lesend fürs Log. Schon das Anlegen des Dictionarys lässt `Process.Start` werfen. `Process.Start` gibt `null` zurück, wenn der Browser schon läuft.
 - **Icons:** `System.Drawing.Icon` liest keine PNG-komprimierten ICO-Einträge (Pillow-Standard). Daraus wird bunter Pixelmüll. Deshalb `bitmap_format="bmp"`.
 - **`new Bitmap(pfad)` sperrt die Datei**, solange das Bitmap lebt. Der Atlas wird deshalb aus dem Speicher dekodiert.
 - **Einstellungsfenster-Snapshot:**

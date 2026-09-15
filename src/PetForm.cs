@@ -838,6 +838,7 @@ namespace AiPets
                 string dir = PetSettings.From(pet, Store.Load()).WorkDir;
                 folder.Text = "Ordner: " + ShortPath(dir) + " …";
                 folder.ToolTipText = dir;
+                folder.Visible = !pet.IsLink;   // a website has no working folder
                 foreach (ToolStripMenuItem item in size.DropDownItems)
                     item.Checked = (int)item.Tag == scale;
                 prefs.Visible = host != null;
