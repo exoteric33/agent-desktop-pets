@@ -1,12 +1,12 @@
 # aipets
 
-Pixel-Art-Desktop-Pets für Windows, eins pro KI-Agent. Die Pets sitzen auf der Taskleiste. Ein Klick öffnet ihren Agenten im Terminal oder seine Website im Browser, und sie zeigen an, ob er gerade arbeitet, auf dich wartet oder fertig ist.
+Pixel-Art-Desktop-Pets für Windows, eins pro KI-Agent. Die Pets sitzen auf der Taskleiste. Ein Klick öffnet ihren Agenten im Terminal, als Desktop-App oder seine Website im Browser, und sie zeigen an, ob er gerade arbeitet, auf dich wartet oder fertig ist.
 
 | Pet | Klick öffnet (Standard) | Umschaltbar auf | Status kommt von |
 |---|---|---|---|
-| **Claude** | Claude Code im Windows Terminal | claude.ai | Claude-Code-Hooks |
-| **Hermes** | Hermes Agent in PowerShell (im Windows Terminal) | hermes-agent.nousresearch.com | Hermes-Shell-Hooks |
-| **Astra** | Codex CLI im Windows Terminal | chatgpt.com/codex | Codex-Hooks |
+| **Claude** | Claude Code im Windows Terminal | Claude-Desktop-App, claude.ai | Claude-Code-Hooks |
+| **Hermes** | Hermes Agent in PowerShell (im Windows Terminal) | Hermes Desktop, hermes-agent.nousresearch.com | Hermes-Shell-Hooks |
+| **Astra** | Codex CLI im Windows Terminal | Codex-Desktop-App (unter Windows „ChatGPT“), chatgpt.com/codex | Codex-Hooks |
 | **Gemini** | gemini.google.com im Standardbrowser | Gemini CLI (`gemini`) | – |
 | **Grok** | grok.com im Standardbrowser | Grok CLI (`grok`) | – |
 
@@ -20,8 +20,13 @@ Pixel-Art-Desktop-Pets für Windows, eins pro KI-Agent. Die Pets sitzen auf der 
 
    Mehrmals ausführen schadet nicht: Was schon stimmt, bleibt unverändert. Von jeder geänderten Datei liegt die vorige Fassung als `<datei>.bak-aipets` daneben. Agents, die gerade laufen, einmal neu starten, damit sie die Hooks laden.
 2. **Bedienen:** Im Infobereich der Taskleiste (bei den ausgeblendeten Symbolen hinter `^`) erscheint das aipets-Icon.
-   - **Linksklick:** Einstellungen. Dort kannst du Pets ein- und ausblenden, die Größe wählen und unter **„Klick öffnet“** zwischen **Programm** und **Website** umschalten.
+   - **Linksklick:** Einstellungen. Dort kannst du Pets ein- und ausblenden, die Größe wählen und unter **„Klick öffnet“** zwischen **Programm**, **Desktop-App** und **Website** umschalten. Die Desktop-App gibt es bei Claude, Hermes und Astra.
+     - Größe: Bei gleicher Größe sind alle Pets gleich hoch, 1× = 162 px, 2× = 324 px usw. Die Pixel-Art wird dafür nur gestreckt, nicht verändert.
      - Programm: Programm, Argumente, Terminal und Arbeitsordner.
+     - Desktop-App: welche App gefunden wurde, mit Version und Ort. Mit „…“ wählst du stattdessen eine andere exe.
+       - Claude öffnet die Claude-App, Astra die Codex-App (Windows nennt sie „ChatGPT“), Hermes die Hermes-Desktop-App.
+       - Astra nimmt dafür `codex app`, ohne Terminalfenster. Das öffnet den Arbeitsordner als Workspace in der App (die Seite zeigt ihn deshalb an), und fehlt die App, öffnet es ihren Installer.
+       - Hermes Desktop muss einmal gebaut werden. Solange sie fehlt, startet ein Klick `hermes desktop` im Terminal. Das baut die App (beim ersten Mal einige Minuten) und öffnet sie, danach startet sie direkt.
      - Website: der Link (nur http/https; `grok.com` wird automatisch zu `https://grok.com/`).
      - Unten: „Mit Windows starten“.
    - **Rechtsklick:** Menü mit allen Pets, Autostart und Beenden.
@@ -33,9 +38,11 @@ Pixel-Art-Desktop-Pets für Windows, eins pro KI-Agent. Die Pets sitzen auf der 
 
 **Hintergrund:** Das Tray-Programm startet jedes Pet als eigenen Prozess (`aipets.exe --pet <id>`). Stürzt ein Pet ab oder wird es beendet, startet das Tray-Programm es neu. Beendest du das Tray-Programm, verschwinden auch die Pets.
 
-**Pet-Rechtsklick:** öffnen, Arbeitsordner (nur im Programm-Modus), „Klick öffnet“ → Programm / Website, Größe, zurück in die Ecke, ausblenden, Einstellungen, aipets beenden.
+**Pet-Rechtsklick:** öffnen, Arbeitsordner (nur im Programm-Modus), „Klick öffnet“ → Programm / Desktop-App / Website, Größe, zurück in die Ecke, ausblenden, Einstellungen, aipets beenden.
 
 Ein Klick startet Claude Code mit `--dangerously-skip-permissions`, Hermes mit `--yolo` und Codex mit `--dangerously-bypass-approvals-and-sandbox`. Gemini öffnet `https://gemini.google.com/app`, Grok `https://grok.com/`, beide im Standardbrowser. Das alles kannst du in den Einstellungen oder in `pets\<id>\pet.ini` ändern. Gemini CLI und Grok CLI sind nicht dabei; wer den Programm-Modus will, muss sie selbst installieren.
+
+Im Desktop-App-Modus startet das Pet die Claude-App und Hermes Desktop so wie das Startmenü. Die installierten Apps findet es selbst: Claude als App-Paket, Hermes Desktop im Ordner, in den `hermes desktop` sie baut. Die Codex-App öffnet `codex app`; ohne Codex CLI startet das Pet das App-Paket direkt. Die Statusanzeige der Codex-App kommt über dieselben Codex-Hooks. Ob die Claude-App und Hermes Desktop die Hooks auslösen, ist noch nicht ausprobiert.
 
 ## Hooks von Hand eintragen
 

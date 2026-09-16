@@ -2,10 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Text;
+using System.Threading;
 
 namespace AiPets
 {
-    /// <summary>Opens a pet's program in a new Windows Terminal window (plain console as fallback), or its link in the browser.</summary>
+    /// <summary>
+    /// Opens a pet's program in a new Windows Terminal window (plain console as fallback),
+    /// its desktop app, or its link in the browser.
+    /// </summary>
     static class Launcher
     {
         public static bool DryRun;
@@ -16,18 +21,34 @@ namespace AiPets
             // a shell-execute start must never touch EnvironmentVariables: that alone makes Process.Start throw
             Log.Write((DryRun ? "dry-run: " : "launch: ") + psi.FileName + " " + psi.Arguments
                 + (!psi.UseShellExecute && psi.EnvironmentVariables.ContainsKey("CLAUDECODE") ? "  [inherited env!]" : ""));
-            if (!DryRun)
-                using (Process.Start(psi)) { }   // null when the browser was already running
+            if (DryRun)
+                return;
+            if (s.OpensApp)
+                Native.AllowSetForegroundWindow(-1);   // this process just got the click: let the app come to the front
+            if (!psi.CreateNoWindow)
+            {
+                using (Process.Start(psi)) { }   // null for a packaged app or a browser that was already running
+                return;
+            }
+            // "codex app" has no window of its own: its messages go to the log, a failure to the user
+            string output;
+            int? code = RunHidden(psi, out output);
+            Log.Write("app command " + (code.HasValue ? "exit " + code.Value : "still running after 60 s")
+                + (output.Length > 0 ? ": " + output.Replace(Environment.NewLine, " | ") : ""));
+            if (code.HasValue && code.Value != 0)
+                throw new InvalidOperationException(pet.Name + ": „" + DesktopApp.ProgramCommand(s, pet.AppCommand)
+                    + "“ ist mit Code " + code.Value + " fehlgeschlagen." + (output.Length > 0 ? "\n\n" + output : ""));
         }
 
         /// <summary>
-        /// shell=direct: the terminal runs the program itself (tab closes when it exits);
-        /// shell=powershell / cmd: the program runs inside that shell, which stays open afterwards.
-        /// Website mode opens the pet's link in the default browser.
+        /// Program mode: see TerminalStartInfo. Website mode opens the link in the default browser.
+        /// App mode: a pet with appcommand lets its program open the app (codex app, in the working
+        /// folder, no window); otherwise the app starts directly. Without an app, a pet with appfallback
+        /// runs its program with those arguments in the terminal (hermes desktop builds Hermes Desktop once, then starts it).
         /// </summary>
         public static ProcessStartInfo BuildStartInfo(PetInfo pet, PetSettings s)
         {
-            if (s.Website)
+            if (s.OpensWebsite)
             {
                 string url = NormalizeUrl(s.Url);
                 if (url == null)
@@ -35,18 +56,142 @@ namespace AiPets
                         + "Trag in den Einstellungen einen Link mit http:// oder https:// ein.");
                 return new ProcessStartInfo(url) { UseShellExecute = true };
             }
+            if (s.OpensApp)
+            {
+                Dictionary<string, string> env = Native.LogonEnvironment();
+                string program = UsesAppCommand(pet, s) ? ProgramPath(pet, s, env) : null;
+                if (program != null)
+                    return HiddenStartInfo(program, pet.AppCommand, WorkDirOf(s), env);
+                DesktopApp app = DesktopApp.Find(s.DesktopApp);
+                if (app != null)
+                {
+                    ProcessStartInfo psi = app.StartInfo();
+                    if (!psi.UseShellExecute)
+                        UseEnvironment(psi, env);
+                    return psi;
+                }
+                if (pet.AppFallback.Length == 0)
+                    throw new FileNotFoundException(pet.Name + ": Die Desktop-App wurde nicht gefunden.\n\n"
+                        + "Installier sie oder wähl in den Einstellungen unter „App“ ihre exe aus.");
+                return TerminalStartInfo(pet, s, pet.AppFallback);
+            }
+            return TerminalStartInfo(pet, s, s.Args);
+        }
 
+        /// <summary>What a click would open, in words (--command).</summary>
+        public static string Describe(PetInfo pet, PetSettings s)
+        {
+            ProcessStartInfo psi = BuildStartInfo(pet, s);
+            if (s.OpensWebsite)
+                return psi.FileName + "\n(im Standardbrowser)";
+            DesktopApp app = s.OpensApp ? DesktopApp.Find(s.DesktopApp) : null;
+            if (psi.CreateNoWindow)
+                return psi.FileName + " " + psi.Arguments + "\n(ohne Fenster, in " + psi.WorkingDirectory
+                    + (app != null ? "; öffnet die Desktop-App " + app : "; Desktop-App nicht gefunden") + ")";
+            if (app != null)
+                return (psi.FileName + " " + psi.Arguments).TrimEnd() + "\n(Desktop-App " + app + ", "
+                    + (app.AppId != null ? "App-Paket " + app.Family : "in " + psi.WorkingDirectory) + ")";
+            return psi.FileName + " " + psi.Arguments + "\n(in " + psi.WorkingDirectory + ")"
+                + (s.OpensApp ? "\n(Desktop-App nicht gefunden, deshalb „" + DesktopApp.ProgramCommand(s, pet.AppFallback) + "“)" : "");
+        }
+
+        /// <summary>
+        /// App mode goes through the program (appcommand): the pet has one, the app is not one the
+        /// user picked, and the program is installed. The working folder matters then.
+        /// </summary>
+        public static bool AppViaProgram(PetInfo pet, PetSettings s)
+        {
+            return UsesAppCommand(pet, s) && ProgramPath(pet, s, Native.LogonEnvironment()) != null;
+        }
+
+        static bool UsesAppCommand(PetInfo pet, PetSettings s)
+        {
+            return pet.AppCommand.Length > 0 && s.DesktopApp == pet.DesktopApp;
+        }
+
+        /// <summary>The pet's program, found with the PATH of this environment (null: the pet's own PATH).</summary>
+        static string ProgramPath(PetInfo pet, PetSettings s, Dictionary<string, string> env)
+        {
+            string path = env != null && env.ContainsKey("PATH") ? env["PATH"] : Environment.GetEnvironmentVariable("PATH");
+            return Resolve(s.Program, pet.Find, path);
+        }
+
+        static string WorkDirOf(PetSettings s)
+        {
+            return Directory.Exists(s.WorkDir) ? s.WorkDir : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        }
+
+        /// <summary>A command without any window, run in the working folder: .cmd shims (npm installs) through cmd.exe.</summary>
+        static ProcessStartInfo HiddenStartInfo(string program, string arguments, string workDir, Dictionary<string, string> env)
+        {
+            string args = (arguments ?? "").Trim();
+            ProcessStartInfo psi = IsBatch(program)
+                ? new ProcessStartInfo("cmd.exe", "/c " + Quote(program) + (args.Length > 0 ? " " + args : ""))
+                : new ProcessStartInfo(program, args);
+            psi.UseShellExecute = false;
+            psi.CreateNoWindow = true;
+            psi.WorkingDirectory = workDir;
+            UseEnvironment(psi, env);
+            return psi;
+        }
+
+        /// <summary>
+        /// Runs a windowless command to its end, at most 60 s: its exit code (null if it still runs)
+        /// and what it printed. Output pipes that its children keep open are not waited for.
+        /// </summary>
+        public static int? RunHidden(ProcessStartInfo psi, out string output)
+        {
+            psi.RedirectStandardOutput = psi.RedirectStandardError = true;
+            psi.StandardOutputEncoding = psi.StandardErrorEncoding = Encoding.UTF8;
+            var text = new StringBuilder();
+            int open = 2;
+            // never disposed: the readers may still call in after this method has returned
+            var closed = new ManualResetEvent(false);
+            DataReceivedEventHandler collect = delegate(object sender, DataReceivedEventArgs e)
+            {
+                if (e.Data != null)
+                {
+                    lock (text)
+                        text.AppendLine(e.Data);
+                }
+                else if (Interlocked.Decrement(ref open) == 0)
+                {
+                    closed.Set();
+                }
+            };
+            using (var process = new Process { StartInfo = psi })
+            {
+                process.OutputDataReceived += collect;
+                process.ErrorDataReceived += collect;
+                process.Start();
+                process.BeginOutputReadLine();
+                process.BeginErrorReadLine();
+                bool exited = process.WaitForExit(60000);
+                if (exited)
+                    closed.WaitOne(1000);   // the last lines, unless a child holds the pipes
+                lock (text)
+                    output = text.ToString().Trim();
+                return exited ? process.ExitCode : (int?)null;
+            }
+        }
+
+        /// <summary>
+        /// shell=direct: the terminal runs the program itself (tab closes when it exits);
+        /// shell=powershell / cmd: the program runs inside that shell, which stays open afterwards.
+        /// </summary>
+        static ProcessStartInfo TerminalStartInfo(PetInfo pet, PetSettings s, string arguments)
+        {
             // wt hands the caller's environment to the new tab, so start from a clean
             // logon environment (also picks up PATH changes made while the pet runs)
             Dictionary<string, string> env = Native.LogonEnvironment();
             string path = env != null && env.ContainsKey("PATH") ? env["PATH"] : Environment.GetEnvironmentVariable("PATH");
 
-            string program = Resolve(s.Program, pet.Find, path);
+            string program = ProgramPath(pet, s, env);
             if (program == null)
                 throw new FileNotFoundException(pet.Name + ": \"" + s.Program + "\" wurde nicht gefunden.\n\n"
                     + "Trag in den Einstellungen den vollen Pfad ein oder nimm den Ordner in den PATH auf.");
-            string workDir = Directory.Exists(s.WorkDir) ? s.WorkDir : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            string args = (s.Args ?? "").Trim();
+            string workDir = WorkDirOf(s);
+            string args = (arguments ?? "").Trim();
 
             string command;
             switch (s.Shell)
@@ -74,13 +219,18 @@ namespace AiPets
                 psi = new ProcessStartInfo("cmd.exe", "/k \"" + command + "\"");
             psi.UseShellExecute = false;
             psi.WorkingDirectory = workDir;
-            if (env != null)
-            {
-                psi.EnvironmentVariables.Clear();
-                foreach (KeyValuePair<string, string> kv in env)
-                    psi.EnvironmentVariables[kv.Key] = kv.Value;
-            }
+            UseEnvironment(psi, env);
             return psi;
+        }
+
+        /// <summary>Gives a CreateProcess start (not shell execute) this environment instead of the pet's own.</summary>
+        static void UseEnvironment(ProcessStartInfo psi, Dictionary<string, string> env)
+        {
+            if (env == null)
+                return;
+            psi.EnvironmentVariables.Clear();
+            foreach (KeyValuePair<string, string> kv in env)
+                psi.EnvironmentVariables[kv.Key] = kv.Value;
         }
 
         /// <summary>

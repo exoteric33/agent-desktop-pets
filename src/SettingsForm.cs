@@ -26,18 +26,22 @@ namespace AiPets
         readonly ListBox list = new ListBox();
         readonly PixelBox avatar = new PixelBox();
         readonly Label title = new Label(), state = new Label(), hooks = new Label();
+        readonly Label appName = new Label(), appWhere = new Label();
         readonly LinkLabel setupLink = new LinkLabel();
         readonly CheckBox showBox = new CheckBox(), autostartBox = new CheckBox();
         readonly RadioButton[] sizes = new RadioButton[4];
-        readonly RadioButton programMode = new RadioButton(), websiteMode = new RadioButton();
+        readonly RadioButton programMode = new RadioButton(), appMode = new RadioButton(), websiteMode = new RadioButton();
         readonly TextBox programBox = new TextBox(), argsBox = new TextBox(), dirBox = new TextBox(), urlBox = new TextBox();
         readonly ComboBox shellBox = new ComboBox();
         readonly Button openButton = new Button(), homeButton = new Button();
-        // "Klick öffnet: Programm" shows program, arguments, terminal and folder; "Website" only the link
-        readonly List<Control> programRows = new List<Control>(), linkRows = new List<Control>();
+        // "Klick öffnet: Programm" shows program, arguments, terminal and folder; "Desktop-App" the app
+        // (and the folder, if the program opens the app: codex app); "Website" only the link
+        readonly List<Control> programRows = new List<Control>(), appRows = new List<Control>(), linkRows = new List<Control>();
+        readonly List<Control> folderRows = new List<Control>();
         PetProcess current;
         Ini shownIni;
         bool loading;
+        string snapshotMode;   // snapshot only: show the page in this mode instead of the saved one
 
         public SettingsForm(TrayHost host)
         {
@@ -173,20 +177,23 @@ namespace AiPets
             y += 36;
             AddLabel(page, "Klick öffnet", y);
             // own panel: radio buttons in the page itself would share one group with the sizes
-            var modes = new Panel { Location = new Point(136, y - 4), Size = new Size(240, 24) };
+            var modes = new Panel { Location = new Point(136, y - 4), Size = new Size(336, 24) };
             programMode.Text = "Programm";
+            appMode.Text = "Desktop-App";
             websiteMode.Text = "Website";
-            programMode.AutoSize = websiteMode.AutoSize = true;
+            // ShowPet puts "Website" behind "Desktop-App", or in its place for pets without an app
             programMode.Location = new Point(4, 3);
-            websiteMode.Location = new Point(120, 3);
-            foreach (RadioButton radio in new[] { programMode, websiteMode })
+            appMode.Location = new Point(112, 3);
+            websiteMode.Location = new Point(232, 3);
+            foreach (RadioButton radio in new[] { programMode, appMode, websiteMode })
             {
                 RadioButton r = radio;
+                r.AutoSize = true;
                 r.CheckedChanged += delegate
                 {
                     if (loading || !r.Checked || current == null || host == null)
                         return;
-                    string mode = r == websiteMode ? "website" : "program";
+                    string mode = r == websiteMode ? "website" : r == appMode ? "app" : "program";
                     host.ChangeSetting(current, "mode", mode == current.Info.Mode ? null : mode);
                     ShowPet(current);
                 };
@@ -199,6 +206,29 @@ namespace AiPets
             programRows.Add(SetupBox(page, programBox, y, 330));
             linkRows.Add(AddLabel(page, "Link", y));
             linkRows.Add(SetupBox(page, urlBox, y, 330));
+            appRows.Add(AddLabel(page, "App", y));
+            appName.Location = new Point(140, y);
+            appName.Size = new Size(292, 18);
+            appName.AutoEllipsis = true;
+            appRows.Add(appName);
+            var pickApp = new Button { Text = "…", Location = new Point(436, y - 4), Size = new Size(34, 25) };
+            pickApp.Click += delegate { BrowseApp(); };
+            appRows.Add(pickApp);
+            appWhere.Location = new Point(140, y + 20);
+            appWhere.Size = new Size(292, 34);
+            appWhere.ForeColor = Muted;
+            appWhere.AutoEllipsis = true;
+            appRows.Add(appWhere);
+            var resetApp = new LinkLabel { Text = "App zurücksetzen", AutoSize = true, Location = new Point(139, y + 59), LinkColor = Accent };
+            resetApp.LinkClicked += delegate
+            {
+                if (current == null || host == null)
+                    return;
+                host.ChangeSetting(current, "app", null);
+                ShowPet(current);
+            };
+            appRows.Add(resetApp);
+            page.Controls.AddRange(new Control[] { appName, pickApp, appWhere, resetApp });
             y += 34;
             programRows.Add(AddLabel(page, "Argumente", y));
             programRows.Add(SetupBox(page, argsBox, y, 330));
@@ -243,12 +273,12 @@ namespace AiPets
             programRows.Add(reset);
 
             y += 56;
-            programRows.Add(AddLabel(page, "Arbeitsordner", y));
-            programRows.Add(SetupBox(page, dirBox, y, 292));
+            folderRows.Add(AddLabel(page, "Arbeitsordner", y));
+            folderRows.Add(SetupBox(page, dirBox, y, 292));
             var browse = new Button { Text = "…", Location = new Point(436, y - 4), Size = new Size(34, 25) };
             browse.Click += delegate { BrowseFolder(); };
             page.Controls.Add(browse);
-            programRows.Add(browse);
+            folderRows.Add(browse);
 
             y += 38;
             AddLabel(page, "Statusanzeige", y);
@@ -387,6 +417,8 @@ namespace AiPets
             Ini ini = host != null ? host.Settings : Store.Load();
             shownIni = ini;
             PetSettings s = PetSettings.From(p.Info, ini);
+            if (snapshotMode != null)
+                s.UseMode(snapshotMode);
             loading = true;
             try
             {
@@ -405,12 +437,24 @@ namespace AiPets
                 if (!dirBox.Focused) dirBox.Text = s.WorkDir;
                 if (!urlBox.Focused) urlBox.Text = s.Url;
                 shellBox.SelectedIndex = Math.Max(0, Array.IndexOf(ShellValues, s.Shell));
-                programMode.Checked = !s.Website;
-                websiteMode.Checked = s.Website;
+                bool hasApp = s.DesktopApp.Length > 0;
+                int gap = appMode.Left - programMode.Left - programMode.PreferredSize.Width;
+                appMode.Visible = hasApp;
+                websiteMode.Left = hasApp ? appMode.Left + appMode.PreferredSize.Width + gap : appMode.Left;
+                programMode.Checked = s.OpensProgram;
+                appMode.Checked = s.OpensApp;
+                websiteMode.Checked = s.OpensWebsite;
+                bool viaProgram = s.OpensApp && Launcher.AppViaProgram(p.Info, s);
                 foreach (Control c in programRows)
-                    c.Visible = !s.Website;
+                    c.Visible = s.OpensProgram;
+                foreach (Control c in appRows)
+                    c.Visible = s.OpensApp;
                 foreach (Control c in linkRows)
-                    c.Visible = s.Website;
+                    c.Visible = s.OpensWebsite;
+                foreach (Control c in folderRows)
+                    c.Visible = s.OpensProgram || viaProgram;
+                if (s.OpensApp)
+                    ShowApp(p.Info, s, viaProgram);
                 openButton.Text = p.Info.OpenText;
                 bool ok;
                 hooks.Text = HookText(p.Info, out ok);
@@ -421,6 +465,24 @@ namespace AiPets
             {
                 loading = false;
             }
+        }
+
+        /// <summary>Which app a click opens and how, or what happens without one.</summary>
+        void ShowApp(PetInfo pet, PetSettings s, bool viaProgram)
+        {
+            DesktopApp app = DesktopApp.Find(s.DesktopApp);
+            appName.ForeColor = app != null ? Color.FromArgb(26, 26, 26) : Muted;
+            appName.Text = app != null ? app.ToString() : "nicht gefunden";
+            if (viaProgram)
+                appWhere.Text = "Ein Klick startet „" + DesktopApp.ProgramCommand(s, pet.AppCommand)
+                    + "“ im Arbeitsordner, ohne Terminalfenster.";
+            else if (app != null)
+                appWhere.Text = app.AppId != null ? "App-Paket " + app.Family : PetForm.ShortPath(app.Exe);
+            else if (pet.AppFallback.Length > 0)
+                appWhere.Text = "Ein Klick startet stattdessen „" + DesktopApp.ProgramCommand(s, pet.AppFallback)
+                    + "“ im Terminal, das die App einrichtet und öffnet.";
+            else
+                appWhere.Text = "Installier die App oder wähl mit „…“ ihre exe aus.";
         }
 
         /// <summary>Called by the tray every second: process states, and settings changed elsewhere (e.g. a pet's own menu).</summary>
@@ -442,11 +504,15 @@ namespace AiPets
             PetInfo info = current.Info;
             string value = box.Text.Trim();
             string key = box == programBox ? "program" : box == argsBox ? "args" : box == urlBox ? "url" : "workdir";
-            if (host.SettingsOf(current).Website != (key == "url"))
-                return;   // the fields of the other mode are hidden
+            PetSettings saved = host.SettingsOf(current);
+            bool shown = key == "url" ? saved.OpensWebsite
+                : key == "workdir" ? saved.OpensProgram || (saved.OpensApp && Launcher.AppViaProgram(info, saved))
+                : saved.OpensProgram;
+            if (!shown)
+                return;   // the fields of the other modes are hidden
             if (key == "workdir" && (value.Length == 0 || !Directory.Exists(value)))
             {
-                box.Text = host.SettingsOf(current).WorkDir;   // not a folder: back to the saved one
+                box.Text = saved.WorkDir;   // not a folder: back to the saved one
                 return;
             }
             if (key == "url")
@@ -454,7 +520,7 @@ namespace AiPets
                 value = Launcher.NormalizeUrl(value);
                 if (value == null)
                 {
-                    box.Text = host.SettingsOf(current).Url;   // not a link: back to the saved one
+                    box.Text = saved.Url;   // not a link: back to the saved one
                     return;
                 }
                 box.Text = value;
@@ -485,6 +551,28 @@ namespace AiPets
                     return;
                 dirBox.Text = dialog.SelectedPath;
                 Commit(dirBox);
+            }
+        }
+
+        /// <summary>"…" in app mode: any exe as the pet's app (packaged apps come from pet.ini).</summary>
+        void BrowseApp()
+        {
+            if (current == null || host == null)
+                return;
+            using (var dialog = new OpenFileDialog())
+            {
+                dialog.Title = "Welche App soll " + current.Info.Name + " öffnen?";
+                dialog.Filter = "Programme (*.exe)|*.exe";
+                DesktopApp app = DesktopApp.Find(host.SettingsOf(current).DesktopApp);
+                if (app != null && app.Exe != null)
+                {
+                    dialog.InitialDirectory = Path.GetDirectoryName(app.Exe);
+                    dialog.FileName = Path.GetFileName(app.Exe);
+                }
+                if (dialog.ShowDialog(this) != DialogResult.OK)
+                    return;
+                host.ChangeSetting(current, "app", dialog.FileName == current.Info.DesktopApp ? null : dialog.FileName);
+                ShowPet(current);
             }
         }
 
@@ -566,9 +654,13 @@ namespace AiPets
             get { return snapshot; }
         }
 
-        /// <summary>Layout check: renders the window (the page of petId, or the first pet) into a PNG from an invisible, off-screen copy.</summary>
-        public static void Snapshot(string path, string petId)
+        /// <summary>
+        /// Layout check: renders the window (the page of petId, or the first pet) from an invisible,
+        /// off-screen copy: settings.png as saved, settings-&lt;mode&gt;.png for each mode the pet offers.
+        /// </summary>
+        public static void Snapshot(string dir, string petId)
         {
+            Directory.CreateDirectory(dir);
             using (var form = new SettingsForm(null))
             {
                 form.snapshot = true;
@@ -578,13 +670,30 @@ namespace AiPets
                 form.Location = new Point(-32000, -32000);
                 form.Show();
                 form.SelectPet(petId);
-                Application.DoEvents();
-                using (var bmp = new Bitmap(form.Width, form.Height))
+                form.SavePng(Path.Combine(dir, "settings.png"));
+                foreach (string mode in new[] { "program", "app", "website" })
                 {
-                    form.DrawToBitmap(bmp, new Rectangle(0, 0, form.Width, form.Height));
-                    bmp.Save(path);
+                    if (form.current == null)
+                        break;
+                    PetSettings s = PetSettings.From(form.current.Info, Store.Load());
+                    s.UseMode(mode);
+                    if (s.Mode != mode)
+                        continue;   // a pet without a desktop app has no app page
+                    form.snapshotMode = mode;
+                    form.ShowPet(form.current);
+                    form.SavePng(Path.Combine(dir, "settings-" + mode + ".png"));
                 }
                 form.Close();
+            }
+        }
+
+        void SavePng(string path)
+        {
+            Application.DoEvents();
+            using (var bmp = new Bitmap(Width, Height))
+            {
+                DrawToBitmap(bmp, new Rectangle(0, 0, Width, Height));
+                bmp.Save(path);
             }
         }
 

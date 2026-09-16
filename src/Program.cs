@@ -14,9 +14,9 @@ namespace AiPets
     /// aipets.exe                          tray (starts and watches the pets)
     /// aipets.exe --pet &lt;id&gt; [--host pid]   one pet window
     /// aipets.exe --hook &lt;source&gt; &lt;event&gt;  agent hook: record the state and exit
-    /// aipets.exe --snapshot &lt;dir&gt; [--pet id]  render pets and settings window (that pet's page) into PNGs
+    /// aipets.exe --snapshot &lt;dir&gt; [--pet id]  render pets, all pets side by side and the settings window (that pet's page, once per mode) into PNGs
     /// aipets.exe --status &lt;source&gt;        print the folded agent state (diagnostics)
-    /// aipets.exe --command &lt;id&gt;           print what a click on the pet would start (diagnostics)
+    /// aipets.exe --command &lt;id&gt; [--mode m] print what a click on the pet would start (diagnostics; m = program, app, website)
     /// aipets.exe --install [--quiet]      autostart + status hooks of the installed agents, then start the tray
     /// aipets.exe --uninstall [--quiet]    quit the tray, remove autostart and hooks
     /// --dry-run: clicks only log what they would start
@@ -54,14 +54,7 @@ namespace AiPets
 
             string command = Option(args, "--command");
             if (command != null)
-            {
-                PetInfo info = PetInfo.ById(command);
-                ProcessStartInfo psi = Launcher.BuildStartInfo(info, PetSettings.From(info, Store.Load()));
-                Console.WriteLine(psi.UseShellExecute
-                    ? psi.FileName + "\n(im Standardbrowser)"
-                    : psi.FileName + " " + psi.Arguments + "\n(in " + psi.WorkingDirectory + ")");
-                return 0;
-            }
+                return PrintCommand(command, Option(args, "--mode"));
 
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
@@ -73,11 +66,13 @@ namespace AiPets
             string snapshot = Option(args, "--snapshot");
             if (snapshot != null)
             {
+                Log.Tag = "snapshot";
                 Native.EnableDpiAwareness();
                 foreach (PetInfo pet in PetInfo.Discover())
                     if (petId == null || pet.Id == petId)
                         PetForm.Snapshot(pet, snapshot);
-                SettingsForm.Snapshot(Path.Combine(snapshot, "settings.png"), petId);
+                PetForm.SnapshotLineup(PetInfo.Discover(), Path.Combine(snapshot, "lineup.png"));
+                SettingsForm.Snapshot(snapshot, petId);
                 return 0;
             }
 
@@ -190,6 +185,30 @@ namespace AiPets
             if (!quiet)
                 MessageBox.Show(text.ToString(), App.Name, MessageBoxButtons.OK, ok ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
             return ok ? 0 : 1;
+        }
+
+        /// <summary>--command: what a click would open, in the saved mode or the given one; errors are printed, not thrown.</summary>
+        static int PrintCommand(string id, string mode)
+        {
+            PetInfo info = PetInfo.ById(id);
+            if (info == null)
+            {
+                Console.WriteLine("Kein Pet mit der id " + id);
+                return 2;
+            }
+            PetSettings s = PetSettings.From(info, Store.Load());
+            if (mode != null)
+                s.UseMode(mode);
+            try
+            {
+                Console.WriteLine(Launcher.Describe(info, s));
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                return 1;
+            }
         }
 
         static bool TrayRunning()

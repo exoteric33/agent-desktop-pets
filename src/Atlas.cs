@@ -20,6 +20,9 @@ namespace AiPets
         /// <summary>Idle phases of the normal face (frames normal_0 … normal_N).</summary>
         public int Phases { get; private set; }
 
+        /// <summary>Rows the character covers in the idle frame normal_0: her height in sprite pixels.</summary>
+        public int FigureHeight { get; private set; }
+
         readonly Bitmap sheet;
         readonly Dictionary<string, Point> frames = new Dictionary<string, Point>();
         readonly Dictionary<string, Rectangle> sprites = new Dictionary<string, Rectangle>();
@@ -82,8 +85,10 @@ namespace AiPets
             while (frames.ContainsKey("normal_" + phases))
                 phases++;
             Phases = Math.Max(1, phases);
-            hoverMask = BuildMask(frames["normal_0"], 2);
-            hoverMaskMirrored = BuildMask(frames["m_normal_0"], 2);
+            bool[] idle = Solid(frames["normal_0"]);
+            FigureHeight = VisibleRows(idle);
+            hoverMask = BuildMask(idle, 2);
+            hoverMaskMirrored = BuildMask(Solid(frames["m_normal_0"]), 2);
         }
 
         static int Int(string s)
@@ -130,20 +135,25 @@ namespace AiPets
             return sprites[name].Size;
         }
 
-        public void DrawFrame(Graphics g, string name, int x, int y, int scale)
+        /// <summary>Draws a frame stretched onto dest (nearest neighbour, also for fractional zoom).</summary>
+        public void DrawFrame(Graphics g, string name, Rectangle dest)
         {
             Point src = frames[name];
-            g.DrawImage(sheet, new Rectangle(x, y, CellW * scale, CellH * scale),
-                src.X, src.Y, CellW, CellH, GraphicsUnit.Pixel, clampEdges);
+            g.DrawImage(sheet, dest, src.X, src.Y, CellW, CellH, GraphicsUnit.Pixel, clampEdges);
         }
 
-        /// <summary>Draws a sprite so that its pivot pixel lands on (x, y) in scaled pixels.</summary>
-        public void DrawSprite(Graphics g, string name, int x, int y, int scale)
+        /// <summary>Draws a sprite so that its pivot pixel lands on (x, y), zoom screen pixels per sprite pixel.</summary>
+        public void DrawSprite(Graphics g, string name, int x, int y, double zoom)
         {
             Rectangle src = sprites[name];
             Point pivot = pivots[name];
-            g.DrawImage(sheet, new Rectangle(x - pivot.X * scale, y - pivot.Y * scale, src.Width * scale, src.Height * scale),
-                src.X, src.Y, src.Width, src.Height, GraphicsUnit.Pixel, clampEdges);
+            var dest = new Rectangle(x - Round(pivot.X * zoom), y - Round(pivot.Y * zoom), Round(src.Width * zoom), Round(src.Height * zoom));
+            g.DrawImage(sheet, dest, src.X, src.Y, src.Width, src.Height, GraphicsUnit.Pixel, clampEdges);
+        }
+
+        static int Round(double value)
+        {
+            return (int)Math.Round(value);
         }
 
         /// <summary>True if the cell pixel belongs to the character (slightly dilated so gaps don't flicker).</summary>
@@ -154,12 +164,33 @@ namespace AiPets
             return (mirrored ? hoverMaskMirrored : hoverMask)[cy * CellW + cx];
         }
 
-        bool[] BuildMask(Point cell, int grow)
+        /// <summary>Which pixels of a frame are not transparent, row by row.</summary>
+        bool[] Solid(Point cell)
         {
             var solid = new bool[CellW * CellH];
             for (int y = 0; y < CellH; y++)
                 for (int x = 0; x < CellW; x++)
                     solid[y * CellW + x] = sheet.GetPixel(cell.X + x, cell.Y + y).A > 0;
+            return solid;
+        }
+
+        /// <summary>Rows from the topmost to the lowest visible pixel (the whole cell if the frame is empty).</summary>
+        int VisibleRows(bool[] solid)
+        {
+            int top = -1, bottom = -1;
+            for (int i = 0; i < solid.Length; i++)
+            {
+                if (!solid[i])
+                    continue;
+                if (top < 0)
+                    top = i / CellW;
+                bottom = i / CellW;
+            }
+            return top < 0 ? CellH : bottom - top + 1;
+        }
+
+        bool[] BuildMask(bool[] solid, int grow)
+        {
             var mask = new bool[CellW * CellH];
             for (int y = 0; y < CellH; y++)
                 for (int x = 0; x < CellW; x++)

@@ -18,18 +18,18 @@ Der Einstieg für Agents (Arbeitsweise, Stand, lokale Einrichtung) steht in [AGE
 - **Pet-Fenster:**
   - Die Figur steht bzw. sitzt unten auf der Taskleiste, immer im Vordergrund. Transparente Stellen lassen Klicks durch.
   - **Maus drüber:** Hover-Gesicht plus Sprechblase mit Prompt.
-  - **Klick:** Funken, Hüpfer (falls das Pet Bounce-Frames hat), dann öffnet sich je nach Modus das **Programm** (im Windows Terminal) oder die **Website** (im Standardbrowser).
-  - **Programm oder Website:** Jedes Pet kann beides. Umschalten in den Einstellungen („Klick öffnet“) oder im Rechtsklick-Menü des Pets („Klick öffnet“ → Programm / Website).
+  - **Klick:** Funken, Hüpfer (falls das Pet Bounce-Frames hat), dann öffnet sich je nach Modus das **Programm** (im Windows Terminal), die **Desktop-App** oder die **Website** (im Standardbrowser).
+  - **Programm, Desktop-App oder Website:** Programm und Website kann jedes Pet, die Desktop-App nur ein Pet mit `app=` in der pet.ini (Claude, Hermes, Astra). Umschalten in den Einstellungen („Klick öffnet“) oder im Rechtsklick-Menü des Pets („Klick öffnet“ → Programm / Desktop-App / Website).
   - **Ziehen:** frei verschiebbar. In Taskleistennähe rastet das Pet ein und schaut zur Bildschirmmitte (Sprites gespiegelt).
   - **Leerlauf:** Nach 1 Minute ohne Eingabe schläft das Pet ein (Zzz).
   - **Vollbild:** Bei Vollbild-Apps blendet es sich aus, bei „Desktop anzeigen“ nicht.
 - **Agent-Status über Hooks:** Spinner-Blase = arbeitet, „?“ = braucht dich, grüner Haken = fertig.
 
-| Pet | Animation | Klick (Standard) | Website / Programm als Alternative | Status |
+| Pet | Animation | Klick (Standard) | Desktop-App / Website / Programm als Alternative | Status |
 |---|---|---|---|---|
-| Claude | Atmen, wehende Haare, Antenne, Blinzeln, Lächeln, Hüpfer | Programm: `wt → claude.exe --dangerously-skip-permissions` | `https://claude.ai/new` | Claude-Code-Hooks |
-| Hermes | nur Gesicht: Blinzeln, Aufschauen, Lächeln, glücklich, schlafen; Musiknoten aus dem Kopfhörer | Programm: `wt → powershell -NoExit → hermes --yolo` | `https://hermes-agent.nousresearch.com/` | Hermes-Shell-Hooks |
-| Astra | Atmen, wehende Haare, funkelnde Sterne in den Galaxie-Strähnen, Ahoge, Katzenohren stellen sich auf, Blinzeln, Aufschauen, „:3“, glücklich, schlafen, Hüpfer; OpenAI-Logo auf dem Shirt | Programm: `wt → cmd /c codex.cmd --dangerously-bypass-approvals-and-sandbox` | `https://chatgpt.com/codex` | Codex-Hooks |
+| Claude | Atmen, wehende Haare, Antenne, Blinzeln, Lächeln, Hüpfer | Programm: `wt → claude.exe --dangerously-skip-permissions` | App-Paket `Claude_pzs8sxrjxfjjc!Claude` (sonst `%LOCALAPPDATA%\AnthropicClaude\claude.exe`); `https://claude.ai/new` | Claude-Code-Hooks |
+| Hermes | nur Gesicht: Blinzeln, Aufschauen, Lächeln, glücklich, schlafen; Musiknoten aus dem Kopfhörer | Programm: `wt → powershell -NoExit → hermes --yolo` | Hermes Desktop: `hermes-agent\apps\desktop\release\win-unpacked\Hermes.exe`, ohne sie `hermes desktop` im Terminal; `https://hermes-agent.nousresearch.com/` | Hermes-Shell-Hooks |
+| Astra | Atmen, wehende Haare, funkelnde Sterne in den Galaxie-Strähnen, Ahoge, Katzenohren stellen sich auf, Blinzeln, Aufschauen, „:3“, glücklich, schlafen, Hüpfer; OpenAI-Logo auf dem Shirt | Programm: `wt → cmd /c codex.cmd --dangerously-bypass-approvals-and-sandbox` | Codex-App: `codex app` im Arbeitsordner, ohne Fenster (ohne CLI das App-Paket `OpenAI.Codex_2p2nqsd0c76g0!App`, Windows zeigt „ChatGPT“); `https://chatgpt.com/codex` | Codex-Hooks |
 | Gemini | Atmen, wehende Haare, Ahoge, Blinzeln, Aufschauen, glücklich mit Zunge wie im Bild, schlafen, Hüpfer; winkt beim Hover und Klick; Google-„G“ auf dem Shirt | Website: `https://gemini.google.com/app` | Programm `gemini` (Gemini CLI, nicht installiert) | – |
 | Grok | Atmen, wehende Haarspitzen, Ahoge, Blinzeln, lacht beim Aufschauen, zwinkert beim Hover wie im Bild, Peace-Zeichen wippt bei Hover und Klick, glücklich, schlafen, Hüpfer; xAI-Logo auf dem Shirt | Website: `https://grok.com/` | Programm `grok` (nicht installiert) | – |
 
@@ -51,7 +51,7 @@ aipets\
 │  └─ aipets.ico
 ├─ pets\
 │  ├─ claude\
-│  │  ├─ pet.ini          Name, Modus, Programm, Link, Terminal, Statusquelle, Home-Position
+│  │  ├─ pet.ini          Name, Modus, Programm, Desktop-App, Link, Terminal, Statusquelle, Home-Position
 │  │  ├─ art\             source.png, make_sprites.py, preview\ (nicht im Repo)
 │  │  └─ sprites\         atlas.png, atlas.txt, icon.ico  ← liest das Programm zur Laufzeit
 │  ├─ hermes\             genauso (source.jpg)
@@ -63,11 +63,12 @@ aipets\
    ├─ Setup.cs            Einrichten und Entfernen: Autostart, Hooks in Claude-/Codex-/Hermes-Configs, Freigaben
    ├─ Json.cs             kleiner JSON-Leser/-Schreiber, der Schlüsselreihenfolge und Werte unverändert lässt
    ├─ TrayHost.cs         Tray-Icon, Menü, Pet-Prozesse starten und neu starten, Befehle der Pets
-   ├─ SettingsForm.cs     Einstellungsfenster (Seite pro Pet, „Klick öffnet: Programm / Website“, „Hooks einrichten“)
+   ├─ SettingsForm.cs     Einstellungsfenster (Seite pro Pet, „Klick öffnet: Programm / Desktop-App / Website“, „Hooks einrichten“)
    ├─ PetForm.cs          Pet-Fenster, Animation, Maus, Menü, Status-Anzeige
-   ├─ Pets.cs             pet.ini lesen (PetInfo), wirksame Einstellungen (PetSettings, Mode/Website)
-   ├─ Atlas.cs            atlas.png/atlas.txt laden, Frames und Sprites zeichnen
-   ├─ Launcher.cs         Klick-Aktion: Programm finden und Terminal-Befehl bauen, oder Link prüfen und im Browser öffnen
+   ├─ Pets.cs             pet.ini lesen (PetInfo), wirksame Einstellungen (PetSettings, Mode/UseMode)
+   ├─ Atlas.cs            atlas.png/atlas.txt laden, Figurenhöhe messen, Frames und Sprites zeichnen
+   ├─ Launcher.cs         Klick-Aktion: Programm finden und Terminal-Befehl bauen, Desktop-App starten, oder Link prüfen und im Browser öffnen
+   ├─ DesktopApp.cs       Desktop-App finden (App-Paket per App-ID oder exe-Pfad), Name, Version, Startinfo
    ├─ Status.cs           Hook-Befehl (claude, hermes, codex) + Auswertung der Statusdateien
    ├─ Native.cs           Win32: Layered Window, DPI, Idle, Vollbild, Logon-Umgebung, IPC
    ├─ Settings.cs         Altlast aus ClaudePet (nicht mehr benutzt, kompiliert aber mit)
@@ -75,7 +76,7 @@ aipets\
 ```
 
 Laufzeitdaten liegen in `%APPDATA%\aipets\`:
-- `settings.ini`: ein Abschnitt pro Pet (`x`, `y`, `scale`, `enabled`, `workdir`, `mode`, `program`, `args`, `shell`, `url`), geschrieben von Tray und Pets, immer unter dem Mutex `Local\aipets.settings`
+- `settings.ini`: ein Abschnitt pro Pet (`x`, `y`, `scale`, `enabled`, `workdir`, `mode`, `program`, `args`, `shell`, `app`, `url`), geschrieben von Tray und Pets, immer unter dem Mutex `Local\aipets.settings`
 - `aipets.log`: jede Zeile mit `[tray]`, `[claude]`, `[hook hermes]` …
 - `status\<quelle>\*.txt`
 
@@ -94,12 +95,16 @@ Laufzeitdaten liegen in `%APPDATA%\aipets\`:
 - **`uninstall.cmd`:** `aipets.exe --uninstall` fragt nach, beendet das Tray per IPC (`quit`), schaltet den Autostart aus und entfernt die Hooks. `%APPDATA%\aipets` bleibt.
 - **Testen, ohne den Desktop anzufassen:**
   - **Test-exe:** mit demselben `csc`-Aufruf wie in `build.ps1`, aber `/out:aipets-test.exe`, in den aipets-Ordner kompilieren (dann findet sie `pets\`). Das laufende aipets bleibt unberührt. Danach löschen.
-  - `aipets.exe --snapshot <ordner> [--pet id]` rendert jedes Pet in allen Zuständen (idle, hover, look, sleep, click, working, waiting, done, beide Blickrichtungen) plus das Einstellungsfenster (mit `--pet` auf der Seite dieses Pets) als PNG.
-  - `aipets.exe --command <id>` gibt aus, was ein Klick starten würde (Terminal-Befehl oder Link).
+  - `aipets.exe --snapshot <ordner> [--pet id]` rendert jedes Pet in allen Zuständen (idle, hover, look, sleep, click, working, waiting, done, beide Blickrichtungen) als PNG, in ganzen 3×-Pixeln.
+    - `lineup.png`: alle Pets bei Größe 2 nebeneinander auf einer Grundlinie. Jeder Kopf muss die obere Linie berühren (2 × 162 px über dem Boden).
+    - Click und working enthalten zufällige Funken und sind bei jedem Lauf anders, alle anderen Bilder bleiben byte-gleich.
+    - Dazu kommt das Einstellungsfenster, mit `--pet` auf der Seite dieses Pets: `settings.png` im gespeicherten Modus, `settings-program.png`, `settings-app.png` (nur mit Desktop-App) und `settings-website.png`.
+  - `aipets.exe --command <id> [--mode program|app|website]` gibt aus, was ein Klick starten würde (Terminal-Befehl, Desktop-App oder Link). `--mode` ändert dabei nichts an `settings.ini`. Fehler (Programm nicht gefunden) stehen in der Ausgabe, Exit-Code 1.
   - `aipets.exe --status <quelle>` gibt den zusammengefassten Agent-Status aus.
   - `--dry-run` (Tray oder Pet): Klicks protokollieren nur in `aipets.log`.
   - Das Programm ist eine GUI-exe. PowerShell wartet nicht darauf und liest ihre Ausgabe nur zuverlässig über `System.Diagnostics.Process` mit Umleitung (siehe Stolperfallen).
-  - **Logik-Tests ohne Fenster:** alle `src\*.cs` plus eine eigene Testklasse mit `/target:exe /main:AiPets.<Klasse>` kompilieren (so wurden `Launcher.NormalizeUrl` und die Modus-Auswahl geprüft).
+  - **Logik-Tests ohne Fenster:** alle `src\*.cs` plus eine eigene Testklasse mit `/target:exe /main:AiPets.<Klasse>` kompilieren (so wurden `Launcher.NormalizeUrl`, die Modus-Auswahl und `DesktopApp` geprüft).
+    - Die Test-exe gehört in den aipets-Ordner, sonst findet `PetInfo.ById` die Pets nicht. Einstellungen baut die Testklasse selbst: `PetSettings.From(pet, Ini.Parse(new[] { "[claude]", "mode=app" }, "app"))`.
   - **Setup-Tests:** nur gegen Kopien der Configs in einem Scratch-Ordner. Die Setup-Methoden nehmen Pfade (siehe Abschnitt 7, „Einrichten“). Die Codex-Freigabe mit `CODEX_HOME` auf einen leeren Ordner. Echte Dateien vorher und nachher per Hash vergleichen.
 
 ## 4. `pet.ini`
@@ -108,25 +113,45 @@ Laufzeitdaten liegen in `%APPDATA%\aipets\`:
 name=Hermes                                  ; Anzeigename
 order=2                                      ; Reihenfolge in Menü und Einstellungen
 open=Hermes öffnen                           ; Menütext
-mode=program                                 ; program | website: was ein Klick öffnet
+mode=program                                 ; program | app | website: was ein Klick öffnet
 program=hermes                               ; Name im PATH oder voller Pfad
 find=%LOCALAPPDATA%\hermes\bin\hermes.exe    ; bekannte Installationsorte, vor dem PATH probiert (;-getrennt)
 args=--yolo
 shell=powershell                             ; direct | powershell | cmd
+app=%LOCALAPPDATA%\hermes\…\Hermes.exe;…     ; Desktop-App für mode=app: App-IDs oder exe-Pfade (;-getrennt)
+appfallback=desktop                          ; ohne gefundene App: das Programm mit diesen Argumenten im Terminal
 url=https://hermes-agent.nousresearch.com/   ; Website für mode=website
 status=hermes                                ; claude | hermes | codex | leer
-home=88                                      ; Abstand zum rechten Bildschirmrand in Sprite-Pixeln
+home=115                                     ; Abstand rechter Bildschirmrand → Zelle, in Pixeln bei Größe 1×
 ```
 
 - **Einstellungen:** Die Werte hier sind Standardwerte. Was du in den Einstellungen änderst, landet in `settings.ini` und überschreibt sie. Die „zurücksetzen“-Links löschen diese Überschreibungen wieder.
-- **`mode`:** `program` oder `website`. Fehlt der Schlüssel, gilt: nur `url` und kein `program` → `website`, sonst `program`. Unbekannte Werte werden `program`.
+- **`mode`:** `program`, `app` oder `website`. Fehlt der Schlüssel, gilt: nur `url` und kein `program` → `website`, sonst `program`. Unbekannte Werte werden `program`, `app` ohne `app=` auch (`PetSettings.UseMode`).
   - Umschalten speichert `mode` in `settings.ini`. Wird der pet.ini-Standard gewählt, wird der Schlüssel dort gelöscht.
   - Im Programm-Modus zeigen die Einstellungen Programm, Argumente, „Öffnen in“ und Arbeitsordner. Im Website-Modus zeigen sie „Link“, „Öffnen in: Standardbrowser“ und „Link zurücksetzen“.
+  - Im Desktop-App-Modus zeigen sie „App“: die gefundene App mit Version, darunter das App-Paket oder den Pfad, sonst „nicht gefunden“ und was ein Klick dann tut. Dazu „…“ (eine exe wählen, landet als `app` in `settings.ini`) und „App zurücksetzen“.
+    - Öffnet `appcommand` die App, steht darunter der Befehl, und der Arbeitsordner ist auch zu sehen.
 - **`shell=direct`:** Das Terminal startet das Programm selbst, der Tab schließt mit dem Programm.
 - **`shell=powershell` / `cmd`:** Das Programm läuft in dieser Shell, und die bleibt danach offen.
+- **`app`:** die Desktop-App. Kandidaten mit `;` getrennt, Umgebungsvariablen erlaubt, der erste installierte gilt (`DesktopApp.Find`). Ohne `app=` bieten Einstellungen und Menü keine Desktop-App an.
+  - **App-ID** (`Paketfamilie!App`, so wie `Get-StartApps` sie zeigt) für App-Pakete (MSIX/Store): Claude `Claude_pzs8sxrjxfjjc!Claude`, Codex `OpenAI.Codex_2p2nqsd0c76g0!App`.
+    - Installiert ist sie, wenn `GetPackagesByPackageFamily` ein Paket liefert. Die Version kommt aus dessen vollem Namen, der Anzeigename vom Shell-Item `shell:AppsFolder\<App-ID>`.
+    - Gestartet wird per Shell-Execute von `shell:AppsFolder\<App-ID>`, wie ein Klick im Startmenü.
+  - **exe-Pfad** für normale Programme (Hermes Desktop): startet in ihrem eigenen Ordner mit frischer Logon-Umgebung, wie die Startmenü-Verknüpfung. Name und Version kommen aus der Versionsinfo der exe.
+  - Vor dem Start gibt das Pet mit `AllowSetForegroundWindow(-1)` sein Vordergrundrecht aus dem Klick weiter, damit die App nach vorn kommen darf.
+- **`appcommand`:** Das Programm öffnet die App selbst, mit diesen Argumenten statt `args` (Codex: `appcommand=app` → `codex app`).
+  - Es läuft ohne Fenster im Arbeitsordner (npm-`.cmd` über `cmd.exe /c`), mit frischer Logon-Umgebung. `Launcher.RunHidden` wartet höchstens 60 s, die Ausgabe kommt ins Log, ein Exit-Code ≠ 0 als Meldung.
+  - Das gilt nur für die App aus der pet.ini. Eine mit „…“ gewählte exe startet direkt, und ohne das Programm (CLI nicht installiert) startet die App aus `app=` direkt.
+  - `app=` braucht es trotzdem: für Name und Version in den Einstellungen und für diesen direkten Start.
+- **`appfallback`:** Wird keine App gefunden, startet ein Klick das Programm (`program`, `find`, `shell`, Arbeitsordner) mit diesen Argumenten statt `args` im Terminal.
+  - Nur Hermes nutzt das: `hermes desktop` baut Hermes Desktop einmal (npm und Electron, dauert Minuten), startet sie und wartet, bis sie geschlossen wird. Danach findet `app=` die gebaute exe.
+  - Ohne `appfallback` kommt die Meldung „Die Desktop-App wurde nicht gefunden“.
 - **`url`:** Es gelten nur http(s)-Links. Eingaben wie `gemini.google.com` bekommen `https://` davor. Alles andere (Dateipfade, `file://`, `javascript:`) wird abgelehnt: im Einstellungsfeld springt der alte Wert zurück, beim Klick kommt eine Meldung.
 - **Programm nicht installiert:** Ein Klick zeigt „… wurde nicht gefunden“ (z. B. Gemini oder Grok im Programm-Modus ohne CLI).
-- **Mehrere Pets:** Die Home-Positionen müssen sich unterscheiden, sonst sitzen die Pets übereinander. Home = Home des rechten Nachbarn + dessen Zellbreite + 4.
+- **Mehrere Pets:** Die Home-Positionen müssen sich unterscheiden, sonst sitzen die Pets übereinander.
+  - `home` wird mit der Größe malgenommen, gilt also für alle Pets gleicher Größe.
+  - Home = Home des rechten Nachbarn + dessen Zellbreite × 162 / Figurenhöhe + 4, aufgerundet. Das ist seine Breite bei 1×, siehe Abschnitt 6, „Größe“.
+  - Reihenfolge von rechts: Claude 12, Hermes 115, Astra 211, Gemini 334, Grok 482.
 
 ## 5. Art-Pipeline (`art/pixelkit.py` + `pets/<id>/art/make_sprites.py`)
 
@@ -149,6 +174,7 @@ home=88                                      ; Abstand zum rechten Bildschirmran
      - Gemini: 229×257, `ENLARGE` 1,5, 32 Farben für den Haarverlauf von Blau über Pink zu Lila.
      - Grok: 1024×900, `ENLARGE` 0,55 (verkleinern), 28 Farben. Damit ist sie etwa so groß wie Hermes (118×162).
    - Vorher Varianten nebeneinander mit den fertigen Pets vergleichen (Atlas-Frame `normal_0` der anderen daneben legen).
+   - Die Gesamthöhe muss dabei nicht passen: Das Programm zeigt jede Figur gleich hoch an (Abschnitt 6, „Größe“). `ENLARGE` bestimmt nur, wie fein die Figur gepixelt ist.
 3. **Handarbeit** mit `kit.patch(img, x, y, rows, colors)` (Zeichen → Farbe, `.` = unverändert). Was die Verkleinerung zerstört, wird neu gesetzt: Claude-Sternchen, Hermes-Kopfhörer und „N“-Halsband.
    - **Logos statt Schriftzug** (Wunsch des Users): immer aus dem echten Vektorlogo rastern, nie freihändig.
      - Astra, OpenAI-Logo: 12 px, punktsymmetrisch gemittelt, drei Tinten (voll, 62 %, 30 % auf Shirt-Weiß). Unter 12 px zerfällt der Knoten.
@@ -204,6 +230,7 @@ anim <name> <sprite> <sprite> …           # optional: burst, twinkle*, z, spin
 - **Pflicht:** `normal_0`, `blink_0`, `happy_0` (+ `m_`-Varianten), Sprites `bubble_r_*`/`bubble_l_*` für `on`, `off`, `wait`, `done` und den Spinner.
 - **Optional:** `hover_0` (sonst happy), `look_0`, `sleep_0` (sonst blink), `drag_0`, `bounce_*` (sonst kein Hüpfer; „braucht dich“ wird dann Aufschauen plus Funkeln).
 - **Phasen:** Anzahl der `normal_N`-Frames.
+- **Figurenhöhe:** sichtbare Zeilen in `normal_0`. Danach richtet sich die angezeigte Größe (Abschnitt 6).
 - **Partikel und Spinner:** kommen aus den `anim`-Zeilen, sonst gelten Claudes Standardnamen (`spark*`, `z*`, `spin0..4` pulsierend).
 - **Blasenseite:** folgt der Blickrichtung (`facing` XOR gespiegelt). Anker `bubble` liegt deshalb auf der Seite, in die das Pet ungespiegelt schaut.
 
@@ -213,17 +240,29 @@ anim <name> <sprite> <sprite> …           # optional: burst, twinkle*, z, spin
   - WinForms-Form mit `WS_EX_LAYERED | TOOLWINDOW | TOPMOST | NOACTIVATE`.
   - Gezeichnet wird in einen premultiplied 32-Bit-DIB, angezeigt per `UpdateLayeredWindow`.
   - `WM_MOUSEACTIVATE → MA_NOACTIVATE`: Anklicken klaut keinen Fokus.
-- **Skalierung:** ganzzahlig, Nearest-Neighbor mit `WrapMode.TileFlipXY`. Pets sind Per-Monitor-DPI-aware, Tray und Einstellungen System-DPI-aware.
+- **Größe:** Bei Größe n ist jedes Pet n × 162 px hoch (`SizeUnit`, die höchste Figur: Grok), egal wie viele Pixel ihr Sprite hat. Alle Pets gleicher Größe sind also gleich hoch.
+  - Figurenhöhe = Zeilen vom obersten bis zum untersten sichtbaren Pixel in `normal_0` (`Atlas.FigureHeight`): Claude 118, Astra 120, Gemini 130, Hermes 157, Grok 162.
+  - `zoom = n × 162 / Figurenhöhe` Bildschirmpixel pro Sprite-Pixel, bei 2×: Claude 2,75, Astra 2,7, Gemini 2,49, Hermes 2,06, Grok 2.
+  - Weil 162 die höchste Figur ist, liegt `zoom` schon bei 1× nie unter 1, kein Sprite-Pixel geht verloren.
+  - Gezeichnet wird mit Nearest-Neighbor und `WrapMode.TileFlipXY`. Bei krummem `zoom` sind Sprite-Pixel 2 oder 3 Bildschirmpixel breit, die Bilder selbst bleiben unverändert.
+  - Zelle und Ränder werden je einmal gerundet (`CellPx`, `CanvasPxW/H`), damit die Figur genau an der Fensterunterkante endet. Der Hover-Test rechnet mit derselben Streckung zurück.
+  - Pets sind Per-Monitor-DPI-aware, Tray und Einstellungen System-DPI-aware.
 - **Timer:** 33 ms bei Bewegung, 55 ms beim Spinner, sonst 80 ms. Neu gezeichnet wird nur bei Änderungen.
 - **Gesicht nach Priorität:** ziehen > schlafen > happy (Klick, Aufwachen) > hover/fertig/Lächeln (mit Blinzeln, falls es ein hover-Gesicht gibt) > blinzeln > aufschauen > normal.
-- **Klick-Aktion:** `Launcher.BuildStartInfo(pet, settings)`. Im Website-Modus ein Shell-Execute-Start des geprüften Links, sonst `wt.exe` mit frischer Logon-Umgebung. `PetSettings.Website` ist der wirksame Modus.
+- **Klick-Aktion:** `Launcher.BuildStartInfo(pet, settings)`. `PetSettings.Mode` ist der wirksame Modus (`OpensProgram`, `OpensApp`, `OpensWebsite`).
+  - Website-Modus: ein Shell-Execute-Start des geprüften Links.
+  - Desktop-App-Modus: erst `appcommand` ohne Fenster (`CreateNoWindow` kennzeichnet das für `Launch`), dann die gefundene App (Abschnitt 4, `app`), dann `appfallback` im Terminal, sonst eine Meldung.
+  - Programm-Modus (`TerminalStartInfo`): `wt.exe` mit frischer Logon-Umgebung.
 - **Einstellungsfenster:** 700×504, eine Seite pro Pet.
-  - Zeilen: Größe, Klick öffnet, dann Programm-Zeilen (`programRows`) oder Website-Zeilen (`linkRows`), Statusanzeige, Buttons.
+  - Zeilen: Größe, Klick öffnet, dann Programm-Zeilen (`programRows`), App-Zeilen (`appRows`) oder Website-Zeilen (`linkRows`), Statusanzeige, Buttons.
+  - Der Arbeitsordner (`folderRows`) steht im Programm-Modus und im Desktop-App-Modus, wenn `appcommand` gilt (`Launcher.AppViaProgram`).
+  - „Desktop-App“ steht nur bei Pets mit `app=`, sonst rückt „Website“ an seine Stelle (Abstand aus `PreferredSize`, damit es bei jeder DPI passt).
   - Jede Änderung wird sofort gespeichert (`TrayHost.ChangeSetting` → `settings.ini` → Nachricht an das Pet).
   - **Statusanzeige:** `HookText` sucht in der Config des Agents nach dem Pfad dieser exe, so geschrieben, wie er dort steht (JSON: `\\`; YAML/PowerShell: `''`).
     - Texte: „✓ Hooks eingerichtet“, „Keine Hooks in …“ oder „Hooks rufen eine andere aipets.exe auf“.
     - Bei den letzten beiden erscheint der Link „Hooks einrichten“ (`Setup.Hooks(quelle, App.ExePath, true)`, Ergebnis als Meldung).
-- **Rechtsklick-Menü des Pets:** öffnen, Ordner (nur im Programm-Modus), Klick öffnet → Programm/Website, Größe, zurück in die Ecke, ausblenden, Einstellungen, beenden.
+- **Rechtsklick-Menü des Pets:** öffnen, Ordner (im Programm-Modus und bei einer App über `appcommand`), Klick öffnet → Programm/Desktop-App/Website, Größe, zurück in die Ecke, ausblenden, Einstellungen, beenden.
+  - „Desktop-App“ gibt es nur bei Pets mit `app=`. Der Tooltip zeigt die gefundene App oder was ein Klick ohne sie tut.
 - **Tray ⇄ Pet:**
   - Pets heißen `aipets.pet.<id>` (Fenstertitel), das Tray-Fenster `aipets.host`.
   - Tray → Pet: registrierte Nachricht `aipets.command` (1 = Einstellungen neu laden, 2 = öffnen) oder `WM_CLOSE`.
@@ -338,9 +377,10 @@ anim <name> <sprite> <sprite> …           # optional: burst, twinkle*, z, spin
 3. **Bildspezifisches** anpassen: Freistellen, `ENLARGE`/`FACTOR`, Details, Gesichts-Patches, Animation, Logo, `anchors`, Icon-Ausschnitt.
    - **Vorgehen:** erst nur pixelisieren und neben die anderen Pets legen, dann Symbol-Dump und Grid-Zoom anschauen, dann die Koordinaten eintragen.
    - Arbeitsskripte (Zooms, Dumps, Vergleiche) in einen Scratch-Ordner, nicht ins Repo.
-4. `pet.ini` schreiben: `mode`, `program`/`find`/`args`/`shell` und `url` (beides, damit man umschalten kann), `status`, `home` ≠ andere Pets.
-5. `.\build.ps1 -Art -Pet <id>` (oder erst eine Test-exe), dann `aipets.exe --snapshot <ordner> --pet <id>` und die PNGs anschauen (alle Zustände plus Einstellungsseite).
-6. `aipets.exe --command <id>` prüfen. Einmal echt klicken, wenn der Befehl stimmt.
+4. `pet.ini` schreiben: `mode`, `program`/`find`/`args`/`shell` und `url` (beides, damit man umschalten kann), `status`, `home` links neben dem letzten Pet (Formel in Abschnitt 4, „Mehrere Pets“).
+   - Hat der Agent eine Desktop-App, auch `app` eintragen: App-ID aus `Get-StartApps` (App-Pakete) oder den exe-Pfad, den die Startmenü-Verknüpfung nutzt.
+5. `.\build.ps1 -Art -Pet <id>` (oder erst eine Test-exe), dann `aipets.exe --snapshot <ordner> --pet <id>` und die PNGs anschauen (alle Zustände, `lineup.png`, Einstellungsseiten).
+6. `aipets.exe --command <id>` prüfen, mit Desktop-App auch `--command <id> --mode app`. Einmal echt klicken, wenn der Befehl stimmt.
 7. Für den Status: Bei einer neuen Quelle `HookCommand.Run`, `Setup.Hooks` und `HookText` erweitern (Abschnitt 7). Dann „Hooks einrichten“ in den Einstellungen und mit `--status <quelle>` prüfen.
 8. README-Tabelle, diese Datei (Tabelle in 1, Art-Notizen in 5) und `AGENTS.md` (Stand) nachziehen.
 
@@ -365,7 +405,23 @@ anim <name> <sprite> <sprite> …           # optional: burst, twinkle*, z, spin
 - **Fremde YAML-Einrückung:** nie feste 2/4 annehmen. Beim Entfernen an der nächsten `-`-Zeile aufhören, sonst verschwindet ein fremder Eintrag mit.
 - **Codex-Test mit `CODEX_HOME` im Temp-Ordner:** Die Warnungen „Refusing to create helper binaries under temporary dir“ und „Project-local config … disabled“ sind harmlos. Die zweite kommt, weil `~\.codex` dann als Projektordner gilt.
 - **Codex zum Testen ohne Spuren:** `codex exec --ephemeral --ignore-user-config --dangerously-bypass-hook-trust -c "hooks.<Event>=[{hooks=[{type=…,command=…}]}]"`. Ein zusätzlicher UserPromptSubmit-Hook mit `Start-Sleep -Seconds 4; [Console]::Error.WriteLine(1); exit 2` blockt den Prompt, dann gibt es keinen Modellaufruf.
-- **Link öffnen:** `ProcessStartInfo` mit `UseShellExecute = true` darf nie `EnvironmentVariables` anfassen, auch nicht lesend fürs Log. Schon das Anlegen des Dictionarys lässt `Process.Start` werfen. `Process.Start` gibt `null` zurück, wenn der Browser schon läuft.
+- **Link öffnen:** `ProcessStartInfo` mit `UseShellExecute = true` darf nie `EnvironmentVariables` anfassen, auch nicht lesend fürs Log. Schon das Anlegen des Dictionarys lässt `Process.Start` werfen. `Process.Start` gibt `null` zurück, wenn der Browser schon läuft. Dasselbe gilt für App-Pakete (`shell:AppsFolder\…`), dort ist es immer `null`.
+- **App-Pakete (MSIX, Store) nie über ihre exe starten:** Der Pfad in `C:\Program Files\WindowsApps\<Paket>_<Version>_…` ändert sich mit jedem Update. Die App-ID bleibt gleich; ob das Paket installiert ist, sagt `GetPackagesByPackageFamily` (ohne COM, geht auf jedem Thread).
+  - Den Anzeigenamen liefert `SHCreateItemFromParsingName("shell:AppsFolder\<App-ID>")`. Das braucht COM. Der Klick selbst braucht den Namen nicht; im Test klappte die Abfrage auch im Thread-Pool (MTA). Scheitert sie, steht der Paketname da.
+  - Der Marshaler macht aus dem HRESULT „nicht gefunden“ eine `FileNotFoundException`, keine `COMException`.
+- **Die Codex-Desktop-App heißt unter Windows „ChatGPT“:** Paket `OpenAI.Codex`, exe `app\ChatGPT.exe`, Protokoll `codex://`. Im Startmenü und in den Einstellungen steht deshalb „ChatGPT“.
+- **`codex app [PATH]`** (Codex CLI 0.154, laut Strings in der `codex.exe`):
+  - Es sucht die App selbst per PowerShell (`Get-StartApps | Where-Object AppID -Like 'OpenAI.Codex_*!App'`) und öffnet den Workspace (Standard `.`) per `Start-Process`.
+  - Ohne App lädt es den Store-Installer (`get.microsoft.com/installer/download/9PLM9XGG6VKS`).
+  - Bis die App aufgeht, vergehen also ein paar Sekunden (node, codex.exe, zweimal PowerShell).
+  - `--help` gibt nur die Hilfe aus und ist gefahrlos. Ohne `--help` öffnet der Befehl die App, also nie zum Testen aufrufen.
+- **Umgeleitete Ausgabe von Befehlen, die etwas starten:** Kindprozesse erben die Pipes und halten sie offen. `ReadToEnd()` oder `WaitForExit()` ohne Zeitlimit hängen dann, bis das Kind endet.
+  - `RunHidden` liest deshalb asynchron, wartet mit Zeitlimit und danach höchstens 1 s auf das Pipe-Ende.
+  - Die Lese-Callbacks laufen auch nach `Dispose` weiter. Sie dürfen nichts Entsorgtes anfassen, sonst stürzt das Pet ab.
+- **Hermes Desktop:**
+  - `hermes desktop` prüft bei jedem Aufruf einen Hash über den Quellcode und baut bei Abweichung neu (npm, Electron). Danach wartet es, bis die App geschlossen wird. Deshalb startet der Klick die gebaute `Hermes.exe` direkt, so wie Hermes' eigene Startmenü-Verknüpfung.
+  - Electron hängt sich beim Start per `AttachConsole` an die Konsole des Elternprozesses (steht in Hermes' `scripts\desktop-update\windows.ps1`). Aus einer Konsole gestartet, hält die App das Fenster offen, und Schließen beendet die App. Pets und Tray sind GUI-Prozesse ohne Konsole, der direkte Start sollte dort also unproblematisch sein (ungetestet: Hermes Desktop ist beim User nicht gebaut).
+  - Das Protokoll `hermes://` kann auf eine `Hermes.exe` zeigen, die es nicht gibt (so beim User). Deshalb nie über das Protokoll starten.
 - **RadioButtons in WinForms** bilden pro Container eine Gruppe. „Klick öffnet“ steht deshalb in einem eigenen `Panel`, sonst schaltet „Website“ die Größen-Buttons ab.
 - **Icons:** `System.Drawing.Icon` liest keine PNG-komprimierten ICO-Einträge (Pillow-Standard). Daraus wird bunter Pixelmüll. Deshalb `bitmap_format="bmp"`.
 - **`new Bitmap(pfad)` sperrt die Datei**, solange das Bitmap lebt. Der Atlas wird deshalb aus dem Speicher dekodiert.
@@ -381,6 +437,10 @@ anim <name> <sprite> <sprite> …           # optional: burst, twinkle*, z, spin
 - **Premultiplied Alpha:** Für `UpdateLayeredWindow` in ein `Format32bppPArgb`-Bitmap über dem DIB zeichnen, nicht `GetHbitmap()` pro Frame.
 - **`DrawImageUnscaled`** skaliert nach der DPI des PNG. Immer mit expliziten Pixel-Rechtecken zeichnen.
 - **Testen, ohne den User zu stören:** nicht seine Maus bewegen. `--snapshot`, `--command`, `--status`, `--dry-run` genügen. Screenshots nur lesend per BitBlt.
+- **`settings.ini` von außen ändern:** Ein Pet speichert bei jedem Loslassen `x`, `y` und seine Größe `scale` aus dem Speicher. Es liest die Datei aber nur jede Sekunde neu (Zeitstempel).
+  - Wer von außen `scale` ändert und das Pet nicht benachrichtigt, verliert die Änderung, wenn der User es in dieser Sekunde loslässt. So ist es passiert.
+  - Deshalb nach `Store.Update` immer `Ipc.PostToPet(id, Ipc.CmdReload)` schicken, wie `TrayHost.ChangeSetting` es tut.
+- **Snapshots schreiben nichts:** Die `PetForm`s dort werden nie angezeigt. Ohne Fenster-Handle gibt es beim `Dispose` kein `FormClosed`, also auch kein `SavePosition`.
 - **Pet „fehlt“ auf dem Desktop:** Erst Fensterliste und `settings.ini` prüfen. Der User verschiebt die Pets gern selbst, manchmal gleich nach dem Start an den Rand.
 - **Ins Chat eingefügte Bilder können das falsche sein** (einmal kam das Gemini-Bild statt Grok): Hash mit bisherigen Vorlagen vergleichen und auf dem Desktop nach der passenden Datei schauen.
 - **Die Bildvorlagen sind nicht selbst gezeichnet:** privat ok, vor dem Veröffentlichen fragen.

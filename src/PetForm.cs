@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Globalization;
 using System.IO;
 using System.Threading;
 using System.Windows.Forms;
@@ -18,6 +19,9 @@ namespace AiPets
     {
         // room around the character cell for the speech bubble and particles (cell pixels)
         const int PadX = 26, PadTop = 20;
+        // screen pixels a pet is tall per size step (1×, 2× …), whatever her sprite height: the tallest
+        // figure (Grok) at 1:1, so all pets stand equally tall at the same size and none is drawn below her own pixels
+        const int SizeUnit = 162;
         const int IdleStepMs = 260, SleepStepMs = 620;
         const int SleepAfterMs = 60 * 1000;
         const int BubbleDelayMs = 120;
@@ -54,7 +58,8 @@ namespace AiPets
         DateTime settingsStamp;
         Native.LayeredSurface surface;
         Graphics gfx;
-        int scale;
+        int scale;                  // the size setting, 1 … 4
+        double zoom;                // screen pixels per sprite pixel at that size (rarely a whole number)
         Point anchor;               // bottom-centre of the pet on screen
         bool mirrored;
         string lastRender;
@@ -103,11 +108,12 @@ namespace AiPets
             Text = Ipc.PetTitle(pet.Id);
             Cursor = Cursors.Hand;
 
-            scale = settings.Scale > 0 ? settings.Scale : DefaultScale();
+            SetScale(settings.Scale > 0 ? settings.Scale : DefaultScale());
             anchor = settings.HasPosition ? Clamp(new Point(settings.X, settings.Y), true) : HomeAnchor();
             mirrored = WantsMirror(anchor, false);
             menu = BuildMenu();
-            Log.Write("start at " + anchor.X + "," + anchor.Y + " (home " + HomeAnchor().X + ", scale " + scale
+            Log.Write("start at " + anchor.X + "," + anchor.Y + " (home " + HomeAnchor().X + ", size " + scale
+                + ", zoom " + Math.Round(zoom, 3).ToString(CultureInfo.InvariantCulture)
                 + ", work area " + Screen.PrimaryScreen.WorkingArea + ")");
 
             nextBlink = 3200;
@@ -171,15 +177,23 @@ namespace AiPets
 
         // ------------------------------------------------------------------ geometry
 
-        int CanvasW { get { return atlas.CellW + 2 * PadX; } }
-        int CanvasH { get { return atlas.CellH + PadTop; } }
+        /// <summary>Screen pixels for a length in cell pixels.</summary>
+        int Px(double cellPixels)
+        {
+            return (int)Math.Round(cellPixels * zoom);
+        }
+
+        // the cell and the room around it, each rounded once, so the figure ends exactly at the window's bottom edge
+        Rectangle CellPx { get { return new Rectangle(Px(PadX), Px(PadTop), Px(atlas.CellW), Px(atlas.CellH)); } }
+        int CanvasPxW { get { return Px(atlas.CellW) + 2 * Px(PadX); } }
+        int CanvasPxH { get { return Px(atlas.CellH) + Px(PadTop); } }
 
         /// <summary>She currently looks to the left (art direction combined with mirroring).</summary>
         bool LooksLeft { get { return atlas.FacingLeft != mirrored; } }
 
         Rectangle WindowRect()
         {
-            int w = CanvasW * scale, h = CanvasH * scale;
+            int w = CanvasPxW, h = CanvasPxH;
             return new Rectangle(anchor.X - w / 2, anchor.Y - h, w, h);
         }
 
@@ -189,21 +203,22 @@ namespace AiPets
                 return Math.Max(1, Math.Min(4, (int)Math.Round(2 * g.DpiX / 96f)));
         }
 
+        /// <summary>"Back to the corner": pet.ini home is the gap from the screen's right edge to the cell's, in pixels at 1×.</summary>
         Point HomeAnchor()
         {
             Rectangle wa = Screen.PrimaryScreen.WorkingArea;
-            return new Point(wa.Right - (atlas.CellW / 2) * scale - pet.Home * scale, wa.Bottom);
+            return new Point(wa.Right - Px(atlas.CellW) / 2 - pet.Home * scale, wa.Bottom);
         }
 
         Point Clamp(Point p, bool snapToTaskbar)
         {
             Rectangle vs = SystemInformation.VirtualScreen;
-            int half = (atlas.CellW / 2 - 6) * scale;
+            int half = Px(atlas.CellW / 2 - 6);
             p.X = Math.Max(vs.Left + half, Math.Min(vs.Right - half, p.X));
             Rectangle wa = Screen.FromPoint(new Point(p.X, Math.Min(p.Y, vs.Bottom - 1))).WorkingArea;
-            int minY = vs.Top + (CanvasH - PadTop - 4) * scale;   // keep the top of her head on screen
+            int minY = vs.Top + Px(atlas.CellH - 4);   // keep the top of her head on screen
             p.Y = Math.Max(minY, Math.Min(wa.Bottom, p.Y));
-            if (snapToTaskbar && wa.Bottom - p.Y < 18 * scale)
+            if (snapToTaskbar && wa.Bottom - p.Y < Px(18))
                 p.Y = wa.Bottom;   // she sits / stands on the taskbar edge
             return p;
         }
@@ -213,20 +228,27 @@ namespace AiPets
         {
             Rectangle wa = Screen.FromPoint(p).WorkingArea;
             int mid = wa.Left + wa.Width / 2;
-            int hysteresis = 12 * scale;
+            int hysteresis = Px(12);
             bool lookLeft = (atlas.FacingLeft != currentlyMirrored)
                 ? p.X > mid - hysteresis
                 : p.X > mid + hysteresis;
             return lookLeft != atlas.FacingLeft;
         }
 
-        void ApplyScale(int newScale)
+        /// <summary>Size setting and zoom: at size n every pet is n × SizeUnit screen pixels tall.</summary>
+        void SetScale(int newScale)
         {
             scale = newScale;
+            zoom = newScale * (double)SizeUnit / atlas.FigureHeight;
+        }
+
+        void ApplyScale(int newScale)
+        {
+            SetScale(newScale);
             anchor = Clamp(anchor, false);
             if (gfx != null) gfx.Dispose();
             if (surface != null) surface.Dispose();
-            surface = new Native.LayeredSurface(CanvasW * scale, CanvasH * scale);
+            surface = new Native.LayeredSurface(CanvasPxW, CanvasPxH);
             gfx = Graphics.FromImage(surface.Bitmap);
             PixelArtMode(gfx);
             Bounds = WindowRect();
@@ -369,8 +391,11 @@ namespace AiPets
             bool over = false;
             if (win.Contains(c) && !hiddenForFullscreen)
             {
-                int lx = (c.X - win.Left) / scale, ly = (c.Y - win.Top) / scale;
-                over = atlas.HitCharacter(lx - PadX, ly - PadTop, mirrored) || (CurrentBubble() != null && BubbleRect().Contains(lx, ly));
+                // back to cell pixels, the way Compose stretches the cell
+                Rectangle cell = CellPx;
+                int cx = (int)Math.Floor((c.X - win.Left - cell.X) * (double)atlas.CellW / cell.Width);
+                int cy = (int)Math.Floor((c.Y - win.Top - cell.Y) * (double)atlas.CellH / cell.Height);
+                over = atlas.HitCharacter(cx, cy, mirrored) || (CurrentBubble() != null && BubbleRect().Contains(cx + PadX, cy + PadTop));
             }
             if (over && !hovered)
                 hoverSince = now;
@@ -547,11 +572,11 @@ namespace AiPets
 
         void Compose(Graphics g, string frame, string bubble)
         {
-            atlas.DrawFrame(g, frame, PadX * scale, PadTop * scale, scale);
+            atlas.DrawFrame(g, frame, CellPx);
             if (bubble != null)
             {
                 Point tip = atlas.Anchor("bubble", mirrored);
-                atlas.DrawSprite(g, bubble, (PadX + tip.X) * scale, (PadTop + tip.Y) * scale, scale);
+                atlas.DrawSprite(g, bubble, Px(PadX + tip.X), Px(PadTop + tip.Y), zoom);
             }
             foreach (Particle p in particles)
             {
@@ -560,7 +585,7 @@ namespace AiPets
                 string sprite = p.Frames[Math.Min(p.Frames.Length - 1, (int)(f * p.Frames.Length))];
                 int x = (int)Math.Round(p.X + p.VX * t);
                 int y = (int)Math.Round(p.Y + p.VY * t + 0.5 * p.Gravity * t * t);
-                atlas.DrawSprite(g, sprite, x * scale, y * scale, scale);
+                atlas.DrawSprite(g, sprite, Px(x), Px(y), zoom);
             }
         }
 
@@ -581,7 +606,7 @@ namespace AiPets
             Directory.CreateDirectory(dir);
             using (var pet = new PetForm(info, null))
             {
-                pet.scale = 3;
+                pet.zoom = 3;   // whole cell pixels, for checking the art
                 foreach (bool mirror in new[] { false, true })
                 {
                     pet.mirrored = mirror;
@@ -623,7 +648,58 @@ namespace AiPets
             }
         }
 
-        void SnapshotState(string path, Action setup)
+        /// <summary>
+        /// Size check: every pet idle at size 2, side by side on one baseline. All heads should touch
+        /// the line 2 × SizeUnit above the ground line.
+        /// </summary>
+        public static void SnapshotLineup(List<PetInfo> infos, string path)
+        {
+            var pets = new List<PetForm>();
+            try
+            {
+                int width = 0, height = 0;
+                foreach (PetInfo info in infos)
+                {
+                    if (!info.HasSprites)
+                        continue;
+                    var pet = new PetForm(info, null);
+                    pets.Add(pet);
+                    pet.SetScale(2);
+                    pet.mirrored = false;
+                    width += pet.CanvasPxW;
+                    height = Math.Max(height, pet.CanvasPxH);
+                }
+                using (var bmp = new Bitmap(Math.Max(1, width), height + 2, System.Drawing.Imaging.PixelFormat.Format32bppPArgb))
+                using (Graphics g = Graphics.FromImage(bmp))
+                {
+                    g.Clear(Color.FromArgb(58, 74, 92));
+                    int x = 0;
+                    foreach (PetForm pet in pets)
+                    {
+                        pet.ResetState();
+                        GraphicsState state = g.Save();
+                        g.TranslateTransform(x, height - pet.CanvasPxH);
+                        PixelArtMode(g);
+                        pet.Compose(g, pet.FrameName(), null);
+                        g.Restore(state);
+                        x += pet.CanvasPxW;
+                    }
+                    using (var pen = new Pen(Color.FromArgb(255, 110, 110)))
+                    {
+                        g.DrawLine(pen, 0, height, width, height);
+                        g.DrawLine(pen, 0, height - 2 * SizeUnit - 1, width, height - 2 * SizeUnit - 1);
+                    }
+                    bmp.Save(path);
+                }
+            }
+            finally
+            {
+                foreach (PetForm pet in pets)
+                    pet.Dispose();
+            }
+        }
+
+        void ResetState()
         {
             now = 21200;   // bubble cursor phase: visible
             hovered = sleeping = false;
@@ -633,8 +709,13 @@ namespace AiPets
             agent = AgentState.Idle;
             doneShownSince = 0;
             particles.Clear();
+        }
+
+        void SnapshotState(string path, Action setup)
+        {
+            ResetState();
             setup();
-            using (var bmp = new Bitmap(CanvasW * scale, CanvasH * scale, System.Drawing.Imaging.PixelFormat.Format32bppPArgb))
+            using (var bmp = new Bitmap(CanvasPxW, CanvasPxH, System.Drawing.Imaging.PixelFormat.Format32bppPArgb))
             using (Graphics g = Graphics.FromImage(bmp))
             {
                 g.Clear(Color.FromArgb(58, 74, 92));
@@ -804,8 +885,9 @@ namespace AiPets
             var folder = new ToolStripMenuItem("Ordner", null, delegate { ChooseFolder(); });
             var opens = new ToolStripMenuItem("Klick öffnet");
             var openProgram = new ToolStripMenuItem("Programm", null, delegate { SetMode("program"); });
+            var openApp = new ToolStripMenuItem("Desktop-App", null, delegate { SetMode("app"); });
             var openWebsite = new ToolStripMenuItem("Website", null, delegate { SetMode("website"); });
-            opens.DropDownItems.AddRange(new ToolStripItem[] { openProgram, openWebsite });
+            opens.DropDownItems.AddRange(new ToolStripItem[] { openProgram, openApp, openWebsite });
             var size = new ToolStripMenuItem("Größe");
             for (int i = 1; i <= 4; i++)
             {
@@ -842,10 +924,14 @@ namespace AiPets
                 PetSettings s = PetSettings.From(pet, Store.Load());
                 folder.Text = "Ordner: " + ShortPath(s.WorkDir) + " …";
                 folder.ToolTipText = s.WorkDir;
-                folder.Visible = !s.Website;   // a website has no working folder
-                openProgram.Checked = !s.Website;
-                openWebsite.Checked = s.Website;
+                // only the terminal and an app opened by the program (codex app) use the working folder
+                folder.Visible = s.OpensProgram || (s.OpensApp && Launcher.AppViaProgram(pet, s));
+                openProgram.Checked = s.OpensProgram;
+                openApp.Checked = s.OpensApp;
+                openWebsite.Checked = s.OpensWebsite;
                 openProgram.ToolTipText = s.Program;
+                openApp.Visible = s.DesktopApp.Length > 0;   // only pets that know a desktop app
+                openApp.ToolTipText = AppText(s);
                 openWebsite.ToolTipText = s.Url;
                 foreach (ToolStripMenuItem item in size.DropDownItems)
                     item.Checked = (int)item.Tag == scale;
@@ -861,11 +947,25 @@ namespace AiPets
             menu.Show(Cursor.Position);
         }
 
-        /// <summary>"program" or "website"; the pet.ini default is stored as no override.</summary>
+        /// <summary>"program", "app" or "website"; the pet.ini default is stored as no override.</summary>
         void SetMode(string mode)
         {
             Store.Update(pet.Id, "mode", mode == pet.Mode ? null : mode);
             settingsStamp = Store.Stamp();
+        }
+
+        /// <summary>Tooltip of "Desktop-App": which app a click opens and how, or what happens without one.</summary>
+        string AppText(PetSettings s)
+        {
+            if (s.DesktopApp.Length == 0)
+                return null;
+            DesktopApp app = DesktopApp.Find(s.DesktopApp);
+            string text = app != null ? app.ToString() : "nicht gefunden";
+            if (Launcher.AppViaProgram(pet, s))
+                return text + ", über „" + DesktopApp.ProgramCommand(s, pet.AppCommand) + "“";
+            if (app == null && pet.AppFallback.Length > 0)
+                return text + ", ein Klick startet „" + DesktopApp.ProgramCommand(s, pet.AppFallback) + "“";
+            return text;
         }
 
         void ChooseFolder()
