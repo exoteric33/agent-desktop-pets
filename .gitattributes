@@ -5,3 +5,5 @@
 *.exe binary
 *.ps1 text eol=crlf
 *.cmd text eol=crlf
+AGENTS.md export-ignore
+CLAUDE.md export-ignore

@@ -126,7 +126,7 @@ namespace AiPets
         {
             string args = (arguments ?? "").Trim();
             ProcessStartInfo psi = IsBatch(program)
-                ? new ProcessStartInfo("cmd.exe", "/c " + Quote(program) + (args.Length > 0 ? " " + args : ""))
+                ? new ProcessStartInfo("cmd.exe", "/d /s /c \"" + Quote(program) + (args.Length > 0 ? " " + args : "") + "\"")
                 : new ProcessStartInfo(program, args);
             psi.UseShellExecute = false;
             psi.CreateNoWindow = true;

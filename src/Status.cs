@@ -147,6 +147,8 @@ namespace AiPets
                 bool owned;
                 try { owned = mutex.WaitOne(3000); }
                 catch (AbandonedMutexException) { owned = true; }
+                if (!owned)
+                    return;
                 try
                 {
                     StatusEntry current = StatusEntry.Read(path);
@@ -207,6 +209,8 @@ namespace AiPets
                 bool owned;
                 try { owned = mutex.WaitOne(3000); }
                 catch (AbandonedMutexException) { owned = true; }
+                if (!owned)
+                    return;
                 try
                 {
                     if (what == "end")

@@ -389,6 +389,8 @@ namespace AiPets
             var hooks = root.Get("hooks") as JsonObject;
             if (hooks == null)
             {
+                if (root.Get("hooks") != null)
+                    throw new FormatException("hooks muss ein JSON-Objekt sein");
                 if (desired == null)
                     return false;
                 hooks = new JsonObject();
@@ -418,6 +420,8 @@ namespace AiPets
                     var groups = hooks.Get(d.Key) as List<object>;
                     if (groups == null)
                     {
+                        if (hooks.Get(d.Key) != null)
+                            throw new FormatException(d.Key + " muss eine JSON-Liste sein");
                         groups = new List<object>();
                         hooks.Set(d.Key, groups);
                     }
@@ -471,7 +475,7 @@ namespace AiPets
 
         static string HermesCommand(string exe, string what)
         {
-            return exe + " --hook hermes " + what;
+            return "\"" + exe + "\" --hook hermes " + what;
         }
 
         /// <summary>
@@ -484,7 +488,24 @@ namespace AiPets
         {
             string original = File.ReadAllText(path);
             var lines = new List<string>(original.Split('\n'));   // a trailing \r stays part of its line
-            int top = lines.FindIndex(l => Regex.IsMatch(l, @"^hooks:\s*(#.*)?$"));
+            var tops = lines.FindAll(l => Regex.IsMatch(l, @"^hooks\s*:"));
+            if (tops.Count > 1)
+                throw new FormatException("Mehrere hooks-Blöcke in config.yaml; bitte zu einem Block zusammenführen.");
+            int top = lines.FindIndex(l => Regex.IsMatch(l, @"^hooks\s*:"));
+            if (top >= 0)
+            {
+                if (!Regex.IsMatch(lines[top], @"^hooks:\s*(\{\s*\}|null|~)?\s*(#.*)?$"))
+                    throw new FormatException("hooks in config.yaml muss als eingerückter YAML-Block vorliegen.");
+                if (install)
+                    lines[top] = Regex.Replace(lines[top], @"^(hooks:)\s*(\{\s*\}|null|~)", "$1");
+                int end = BlockEnd(lines, top);
+                foreach (string[] e in HermesEvents)
+                {
+                    var keys = lines.GetRange(top + 1, end - top - 1).FindAll(l => Regex.IsMatch(l, @"^\s+" + e[0] + @":\s*"));
+                    if (keys.Count > 1 || keys.Exists(l => !Regex.IsMatch(l, @"^\s+" + e[0] + @":\s*(\[\s*\])?\s*(#.*)?$")))
+                        throw new FormatException(e[0] + " muss einmal als eingerückte YAML-Liste vorliegen.");
+                }
+            }
             if (top < 0 && !install)
                 return false;
             if (install && top >= 0 && HermesUpToDate(lines, top, exe))
@@ -594,7 +615,7 @@ namespace AiPets
                         int key = -1;
                         for (int i = top + 1; i < end; i++)
                         {
-                            if (Regex.IsMatch(lines[i], @"^\s+" + e[0] + @":\s*(\[\s*\])?\s*$"))
+                            if (Regex.IsMatch(lines[i], @"^\s+" + e[0] + @":\s*(\[\s*\])?\s*(#.*)?$"))
                             {
                                 key = i;
                                 break;
@@ -603,7 +624,7 @@ namespace AiPets
                         if (key >= 0)
                         {
                             string eol = lines[key].EndsWith("\r") ? "\r" : "";
-                            lines[key] = Regex.Replace(lines[key].TrimEnd('\r'), @"\s*\[\s*\]\s*$", "") + eol;
+                            lines[key] = Regex.Replace(lines[key].TrimEnd('\r'), @"\[\s*\]", "") + eol;
                             // line up with the items already under this key
                             bool listed = key + 1 < end && lines[key + 1].TrimStart().StartsWith("-") && Indent(lines[key + 1]) >= Indent(lines[key]);
                             List<string> item = HermesItem(exe, e[1], listed ? Indent(lines[key + 1]) : Indent(lines[key]) + itemOffset, eol);
@@ -675,7 +696,7 @@ namespace AiPets
                 string trimmed = lines[k].Trim();
                 if (trimmed.Length == 0 || trimmed.StartsWith("#") || Indent(lines[k]) > indent || (Indent(lines[k]) == indent && trimmed.StartsWith("-")))
                     continue;   // blank, comment, part of an earlier item, or an earlier item of the same list
-                Match key = Regex.Match(lines[k], @"^\s+([A-Za-z_]+):\s*$");
+                Match key = Regex.Match(lines[k], @"^\s+([A-Za-z_]+):\s*(#.*)?$");
                 return key.Success ? key.Groups[1].Value : null;
             }
             return null;
@@ -716,11 +737,15 @@ namespace AiPets
             bool empty = original.Trim().Length == 0;
             if (empty && !install)
                 return false;
-            var root = (empty ? new JsonObject() : Json.Parse(original)) as JsonObject ?? new JsonObject();
+            var root = (empty ? new JsonObject() : Json.Parse(original)) as JsonObject;
+            if (root == null)
+                throw new FormatException(Path.GetFileName(path) + " enthält kein JSON-Objekt");
             string before = empty ? "" : Json.Write(Json.Parse(original));
             var approvals = root.Get("approvals") as List<object>;
             if (approvals == null)
             {
+                if (root.Get("approvals") != null)
+                    throw new FormatException("approvals muss eine JSON-Liste sein");
                 approvals = new List<object>();
                 root.Set("approvals", approvals);
             }
@@ -777,11 +802,11 @@ namespace AiPets
         static void Save(string path, string original, string text, bool matchLineEndings = true)
         {
             if (original.Length > 0)
-                File.WriteAllText(path + ".bak-aipets", original, new UTF8Encoding(false));
+                AtomicFile.Write(path + ".bak-aipets", original);
             if (matchLineEndings && original.Contains("\r\n"))
                 text = text.Replace("\r\n", "\n").Replace("\n", "\r\n");
             Directory.CreateDirectory(Path.GetDirectoryName(path));
-            File.WriteAllText(path, text, new UTF8Encoding(false));
+            AtomicFile.Write(path, text);
         }
     }
 }

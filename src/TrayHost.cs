@@ -130,25 +130,35 @@ namespace AiPets
         /// </summary>
         void MoveSizesToHeights()
         {
+            Store.Change(delegate(Ini current) { MigrateSizes(current, Pets); });
+            ReloadIni();
+        }
+
+        /// <summary>Migrate all sizes in the same settings transaction, preserving concurrent user changes.</summary>
+        public static void MigrateSizes(Ini ini, List<PetProcess> pets)
+        {
             if (ini.Get("app", "height") != null)
                 return;
             double shared = OldSize(ini.Get("app", "size"));
             if (shared == 0)
-                shared = CommonOldSize(ini, Pets);
+                shared = CommonOldSize(ini, pets);
             if (shared == 0)
                 return;
             int all = ToHeight(shared);
-            Store.Update("app", "height", PetSettings.Number(all), "size", null);
-            foreach (PetProcess p in Pets)
+            ini.Set("app", "height", PetSettings.Number(all));
+            ini.Set("app", "size", null);
+            foreach (PetProcess p in pets)
             {
                 string id = p.Info.Id;
                 if (ini.Get(id, "scale") == null && ini.Get(id, "percent") == null)
                     continue;
                 int own = ToHeight(OwnOldSize(ini, id, shared));
-                Store.Update(id, "scale", null, "percent", null, "height", own == all ? null : PetSettings.Number(own));
+                ini.Set(id, "scale", null);
+                ini.Set(id, "percent", null);
+                if (ini.Get(id, "height") == null)
+                    ini.Set(id, "height", own == all ? null : PetSettings.Number(own));
             }
             Log.Write("sizes now heights: " + all + " px for all pets");
-            ReloadIni();
         }
 
         /// <summary>An old size in pixels, never below the smallest height (an old 50 % could mean 81 px).</summary>
@@ -193,7 +203,7 @@ namespace AiPets
 
         void Supervise()
         {
-            if (Store.Stamp() != iniStamp)
+            if (!iniRead || Store.Stamp() != iniStamp)
                 ReloadIni();
             long now = clock.ElapsedMilliseconds;
             foreach (PetProcess p in Pets)

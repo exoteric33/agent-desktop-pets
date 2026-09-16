@@ -8,4 +8,5 @@ if not exist "%~dp0aipets.exe" (
   pause
   exit /b 1
 )
-"%~dp0aipets.exe" --uninstall
+start "" /wait "%~dp0aipets.exe" --uninstall
+exit /b %errorlevel%

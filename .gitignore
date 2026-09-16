@@ -1,7 +1,8 @@
 # build output (rebuild with .\build.ps1)
 aipets.exe
 *.tmp
-
-# sprite generator leftovers; pets/*/sprites and art/aipets.ico stay tracked so build.ps1 works without Python
-__pycache__/
-pets/*/art/preview/
+dist/
+AGENTS.md
+CLAUDE.md
+**/AGENTS.md
+**/CLAUDE.md

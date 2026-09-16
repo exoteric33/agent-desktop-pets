@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace AiPets
 {
@@ -154,8 +155,10 @@ namespace AiPets
             return sb.ToString();
         }
 
-        static object ParseValue(string s, ref int i)
+        static object ParseValue(string s, ref int i, int depth = 0)
         {
+            if (depth > 128)
+                throw new FormatException("JSON nesting is too deep");
             SkipSpace(s, ref i);
             if (i >= s.Length)
                 throw new FormatException("unexpected end of JSON");
@@ -173,13 +176,17 @@ namespace AiPets
                 while (true)
                 {
                     SkipSpace(s, ref i);
-                    object key = ParseValue(s, ref i);
+                    if (i >= s.Length || s[i] != '"')
+                        throw new FormatException("object key is not a string at " + i);
+                    object key = ParseValue(s, ref i, depth + 1);
                     string name = Text(key);
                     if (name == null)
                         throw new FormatException("object key is not a string at " + i);
                     SkipSpace(s, ref i);
                     Expect(s, ref i, ':');
-                    obj.Items.Add(new KeyValuePair<string, object>(name, ParseValue(s, ref i)));
+                    if (obj.Get(name) != null)
+                        throw new FormatException("duplicate JSON key: " + name);
+                    obj.Items.Add(new KeyValuePair<string, object>(name, ParseValue(s, ref i, depth + 1)));
                     SkipSpace(s, ref i);
                     if (i < s.Length && s[i] == ',')
                     {
@@ -202,7 +209,7 @@ namespace AiPets
                 }
                 while (true)
                 {
-                    list.Add(ParseValue(s, ref i));
+                    list.Add(ParseValue(s, ref i, depth + 1));
                     SkipSpace(s, ref i);
                     if (i < s.Length && s[i] == ',')
                     {
@@ -217,8 +224,21 @@ namespace AiPets
             if (c == '"')
             {
                 for (i++; i < s.Length && s[i] != '"'; i++)
-                    if (s[i] == '\\')
-                        i++;
+                {
+                    if (s[i] < ' ')
+                        throw new FormatException("unescaped control character at " + i);
+                    if (s[i] != '\\')
+                        continue;
+                    i++;
+                    if (i >= s.Length || "\"\\/bfnrtu".IndexOf(s[i]) < 0)
+                        throw new FormatException("invalid JSON escape at " + i);
+                    if (s[i] == 'u')
+                    {
+                        for (int digit = 0; digit < 4; digit++)
+                            if (++i >= s.Length || !Uri.IsHexDigit(s[i]))
+                                throw new FormatException("invalid unicode escape at " + i);
+                    }
+                }
                 if (i >= s.Length)
                     throw new FormatException("unterminated string at " + start);
                 i++;
@@ -228,7 +248,11 @@ namespace AiPets
                 i++;
             if (i == start)
                 throw new FormatException("unexpected character '" + c + "' at " + i);
-            return new JsonValue(s.Substring(start, i - start));
+            string raw = s.Substring(start, i - start);
+            if (raw != "true" && raw != "false" && raw != "null"
+                && !Regex.IsMatch(raw, @"\A-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?\z"))
+                throw new FormatException("invalid JSON value at " + start);
+            return new JsonValue(raw);
         }
 
         static void SkipSpace(string s, ref int i)

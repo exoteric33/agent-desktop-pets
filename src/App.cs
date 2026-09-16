@@ -107,6 +107,7 @@ namespace AiPets
     static class Store
     {
         public static readonly string FilePath = Path.Combine(App.DataDir, "settings.ini");
+        static readonly string MutexName = "Local\\aipets.settings";
 
         public static Ini Load()
         {
@@ -145,9 +146,13 @@ namespace AiPets
             Locked(delegate
             {
                 Ini ini = Read() ?? new Ini();
+                string before = ini.Format();
                 change(ini);
+                string after = ini.Format();
+                if (after == before)
+                    return;
                 Directory.CreateDirectory(App.DataDir);
-                File.WriteAllText(FilePath, ini.Format());
+                AtomicFile.Write(FilePath, after);
             });
         }
 
@@ -167,8 +172,10 @@ namespace AiPets
             {
                 try
                 {
-                    return File.Exists(FilePath) ? Ini.Parse(File.ReadAllLines(FilePath), "app") : null;
+                    return Ini.Parse(File.ReadAllLines(FilePath), "app");
                 }
+                catch (FileNotFoundException) { return null; }
+                catch (DirectoryNotFoundException) { return null; }
                 catch (IOException)
                 {
                     if (attempt == 5)
@@ -180,7 +187,7 @@ namespace AiPets
 
         static void Locked(Action action)
         {
-            using (var mutex = new Mutex(false, "Local\\aipets.settings"))
+            using (var mutex = new Mutex(false, MutexName))
             {
                 bool owned;
                 try
@@ -190,6 +197,11 @@ namespace AiPets
                 catch (AbandonedMutexException)
                 {
                     owned = true;   // a process died while writing; the file is still whole or absent
+                }
+                if (!owned)
+                {
+                    Log.Write("settings: lock timed out; operation skipped");
+                    return;
                 }
                 try
                 {
@@ -208,6 +220,33 @@ namespace AiPets
                     if (owned)
                         mutex.ReleaseMutex();
                 }
+            }
+        }
+    }
+
+    /// <summary>Write beside the destination, then atomically replace it. A failed write keeps the old file.</summary>
+    static class AtomicFile
+    {
+        public static void Write(string path, string text)
+        {
+            string temp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            try
+            {
+                using (var stream = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                {
+                    byte[] bytes = new UTF8Encoding(false).GetBytes(text);
+                    stream.Write(bytes, 0, bytes.Length);
+                    stream.Flush(true);
+                }
+                if (File.Exists(path))
+                    File.Replace(temp, path, null);
+                else
+                    File.Move(temp, path);
+            }
+            finally
+            {
+                if (File.Exists(temp))
+                    File.Delete(temp);
             }
         }
     }

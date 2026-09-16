@@ -81,9 +81,12 @@ namespace AiPets
         {
             this.pet = pet;
             this.host = host;
-            atlas = Atlas.Load(pet.SpritesDir);
-            settings = PetSettings.From(pet, Store.Load());
             settingsStamp = Store.Stamp();
+            Ini initial;
+            if (!Store.TryLoad(out initial))
+                throw new IOException("Die Pet-Einstellungen sind momentan nicht lesbar.");
+            settings = PetSettings.From(pet, initial);
+            atlas = Atlas.Load(pet.SpritesDir);
             status = pet.Status.Length > 0 ? new StatusMonitor(pet.Status) : null;
 
             canBounce = atlas.HasFrame("bounce_1");
@@ -291,8 +294,12 @@ namespace AiPets
         /// <summary>settings.ini changed (tray settings window, "back to the corner", another size).</summary>
         void ReloadSettings()
         {
-            settingsStamp = Store.Stamp();
-            PetSettings s = PetSettings.From(pet, Store.Load());
+            DateTime stamp = Store.Stamp();
+            Ini loaded;
+            if (!Store.TryLoad(out loaded))
+                return;
+            settingsStamp = stamp;
+            PetSettings s = PetSettings.From(pet, loaded);
             int newHeight = FitScreen(anchor, s.PetHeight());
             settings = s;
             if (newHeight != height)
@@ -868,7 +875,7 @@ namespace AiPets
             if (now - lastLaunch < 1500)
                 return;   // double clicks open one window, not two
             lastLaunch = now;
-            PetSettings s = PetSettings.From(pet, Store.Load());
+            PetSettings s = ReadSettings();
             ThreadPool.QueueUserWorkItem(delegate
             {
                 try
@@ -893,7 +900,13 @@ namespace AiPets
             settings.HasPosition = true;
             settings.X = anchor.X;
             settings.Y = anchor.Y;
-            settingsStamp = Store.Stamp();
+            // Do not acknowledge unrelated changes that were saved before this position write.
+        }
+
+        PetSettings ReadSettings()
+        {
+            Ini loaded;
+            return Store.TryLoad(out loaded) ? PetSettings.From(pet, loaded) : settings;
         }
 
         // ------------------------------------------------------------------ menu
@@ -935,7 +948,6 @@ namespace AiPets
             {
                 // saved here as well: she stays hidden after a restart even if the tray does not answer now
                 Store.Update(pet.Id, "enabled", "0");
-                settingsStamp = Store.Stamp();
                 if (!Ipc.SendToHost("hide " + pet.Id))
                     Close();
             });
@@ -952,7 +964,7 @@ namespace AiPets
             });
             strip.Opening += delegate
             {
-                PetSettings s = PetSettings.From(pet, Store.Load());
+                PetSettings s = ReadSettings();
                 folder.Text = "Ordner: " + ShortPath(s.WorkDir) + " …";
                 folder.ToolTipText = s.WorkDir;
                 // only the terminal and an app opened by the program (codex app) use the working folder
@@ -1003,8 +1015,12 @@ namespace AiPets
         /// <summary>A height this pet wrote itself: apply it now instead of waiting for the file stamp.</summary>
         void TakeOwnChange()
         {
-            settingsStamp = Store.Stamp();
-            settings = PetSettings.From(pet, Store.Load());
+            DateTime stamp = Store.Stamp();
+            Ini loaded;
+            if (!Store.TryLoad(out loaded))
+                return;
+            settingsStamp = stamp;
+            settings = PetSettings.From(pet, loaded);
             FitHeight();
             SavePosition();
         }
@@ -1013,7 +1029,6 @@ namespace AiPets
         void SetMode(string mode)
         {
             Store.Update(pet.Id, "mode", mode == pet.Mode ? null : mode);
-            settingsStamp = Store.Stamp();
         }
 
         /// <summary>Tooltip of "Desktop-App": which app a click opens and how, or what happens without one.</summary>
@@ -1035,11 +1050,10 @@ namespace AiPets
             using (var dialog = new FolderBrowserDialog())
             {
                 dialog.Description = "In welchem Ordner soll " + pet.Name + " starten?";
-                dialog.SelectedPath = PetSettings.From(pet, Store.Load()).WorkDir;
+                dialog.SelectedPath = ReadSettings().WorkDir;
                 if (dialog.ShowDialog(this) == DialogResult.OK && Directory.Exists(dialog.SelectedPath))
                 {
                     Store.Update(pet.Id, "workdir", dialog.SelectedPath);
-                    settingsStamp = Store.Stamp();
                 }
             }
         }

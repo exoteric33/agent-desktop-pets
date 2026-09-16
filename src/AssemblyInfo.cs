@@ -1,0 +1,8 @@
+using System.Reflection;
+
+[assembly: AssemblyTitle("aipets")]
+[assembly: AssemblyDescription("Pixel-Art-Desktop-Pets für Windows")]
+[assembly: AssemblyProduct("aipets")]
+[assembly: AssemblyVersion("0.1.0.0")]
+[assembly: AssemblyFileVersion("0.1.0.0")]
+[assembly: AssemblyInformationalVersion("0.1.0-rc.1")]

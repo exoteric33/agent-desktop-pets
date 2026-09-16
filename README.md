@@ -12,10 +12,12 @@ Pixel-Art-Desktop-Pets für Windows, eins pro KI-Agent. Die Pets sitzen auf der 
 
 ## Schnellstart
 
+Voraussetzung: Windows 10/11 mit .NET Framework 4.8. Windows Terminal ist optional; ohne es wird die Windows-Konsole verwendet. Für das fertige Paket sind weder Python noch ein separat installiertes .NET-SDK nötig.
+
 1. **Installieren:** Den Ordner dorthin legen, wo er bleiben soll (klonen oder ZIP entpacken), und **`install.cmd` doppelklicken.** Autostart und Hooks merken sich den Pfad.
-   - Baut `aipets.exe` mit dem C#-Compiler, der in Windows eingebaut ist. Installieren musst du nichts.
+   - Im Quellcode-Ordner wird `aipets.exe` mit dem C#-Compiler aus Windows gebaut. Das Release-ZIP enthält die fertige exe und überspringt den Build.
    - Schaltet „Mit Windows starten“ ein.
-   - Trägt die Status-Hooks für Claude Code, Codex und Hermes Agent ein, soweit sie installiert sind, und gibt sie gleich frei. In Codex musst du nichts unter `/hooks` bestätigen und in Hermes nichts erlauben.
+   - Trägt die Status-Hooks für Claude Code, Codex und Hermes Agent ein, soweit sie installiert sind, und richtet die Freigaben ein. Für die automatische Codex-Freigabe muss die Codex CLI vorhanden sein; andernfalls zeigt die Zusammenfassung die nötigen Schritte unter `/hooks`.
    - Startet aipets und zeigt am Ende, was es gemacht hat.
 
    Mehrmals ausführen schadet nicht: Was schon stimmt, bleibt unverändert. Von jeder geänderten Datei liegt die vorige Fassung als `<datei>.bak-aipets` daneben. Agents, die gerade laufen, einmal neu starten, damit sie die Hooks laden.
@@ -37,7 +39,7 @@ Pixel-Art-Desktop-Pets für Windows, eins pro KI-Agent. Die Pets sitzen auf der 
 
 **Ordner verschoben oder einen Agent erst später installiert?** Die Einstellungen zeigen unter „Statusanzeige“, ob die Hooks zu dieser `aipets.exe` passen. Wenn nicht, trägt der Link **„Hooks einrichten“** darunter sie mit einem Klick neu ein. Nach dem Verschieben erledigt `install.cmd` im neuen Ordner alles auf einmal, auch den Autostart.
 
-**Ohne Doppelklick:** `.\build.ps1` baut nur, `.\build.ps1 -Art` erzeugt vorher App-Icon und Sprites neu (dafür brauchst du Python mit `numpy` und `Pillow`). `aipets.exe --install` und `aipets.exe --uninstall` machen dasselbe wie die beiden cmd-Dateien, mit `--quiet` ohne Fenster. Die exe muss neben dem Ordner `pets\` liegen.
+**Ohne Doppelklick:** `.\build.ps1` baut nur. `aipets.exe --install` und `aipets.exe --uninstall` machen dasselbe wie die beiden cmd-Dateien, mit `--quiet` ohne Fenster. Die exe muss neben dem Ordner `pets\` liegen.
 
 **Hintergrund:** Das Tray-Programm startet jedes Pet als eigenen Prozess (`aipets.exe --pet <id>`). Stürzt ein Pet ab oder wird es beendet, startet das Tray-Programm es neu. Beendest du das Tray-Programm, verschwinden auch die Pets.
 
@@ -73,19 +75,19 @@ In die `config.yaml` von Hermes eintragen. Sie liegt in `%HERMES_HOME%`, bei der
 ```yaml
 hooks:
   pre_llm_call:
-    - command: 'C:\Pfad\zu\aipets.exe --hook hermes working'
+    - command: '"C:\Pfad\zu\aipets.exe" --hook hermes working'
       timeout: 10
   pre_approval_request:
-    - command: 'C:\Pfad\zu\aipets.exe --hook hermes waiting'
+    - command: '"C:\Pfad\zu\aipets.exe" --hook hermes waiting'
       timeout: 10
   post_approval_response:
-    - command: 'C:\Pfad\zu\aipets.exe --hook hermes resume'
+    - command: '"C:\Pfad\zu\aipets.exe" --hook hermes resume'
       timeout: 10
   on_session_end:
-    - command: 'C:\Pfad\zu\aipets.exe --hook hermes done'
+    - command: '"C:\Pfad\zu\aipets.exe" --hook hermes done'
       timeout: 10
   on_session_finalize:
-    - command: 'C:\Pfad\zu\aipets.exe --hook hermes end'
+    - command: '"C:\Pfad\zu\aipets.exe" --hook hermes end'
       timeout: 10
 ```
 
@@ -110,8 +112,18 @@ In `%USERPROFILE%\.codex\hooks.json` eintragen (bzw. `%CODEX_HOME%\hooks.json`) 
 
 Codex führt neue Hooks erst aus, wenn du sie freigegeben hast: In Codex `/hooks` öffnen und die sechs aipets-Hooks als vertrauenswürdig markieren. Änderst du einen Befehl (z. B. weil die exe woanders liegt), fragt Codex erneut.
 
-## Mehr
+## Selbst bauen
 
-In [PET-BAUANLEITUNG.md](PET-BAUANLEITUNG.md) findest du Aufbau, Art-Pipeline, Status-Protokoll, eine Checkliste für neue Pets und bekannte Stolperfallen. Wer als Agent (Claude Code, Codex, Hermes …) weiterarbeitet, startet mit [AGENTS.md](AGENTS.md).
+```powershell
+.\build.ps1                         # bauen, danach laufende Pets neu starten
+.\build.ps1 -OutputDirectory C:\Temp\aipets-build  # bauen ohne laufende Pets anzufassen
+```
 
-> Die Bildvorlagen in `pets/*/art/` sind Fan-Art fremder Artists bzw. nicht selbst gezeichnet. Halte das Repo privat oder ersetze die Bilder (samt `sprites/`), bevor du es veröffentlichst.
+`-OutputDirectory` enthält nur die exe; zum Ausführen muss daneben `pets\` liegen. Die Versionsnummer steht in `src/AssemblyInfo.cs`. Die exe ist nicht signiert.
+
+## Bekannte Grenzen
+
+- Gemini und Grok zeigen im Website-Modus keinen Arbeitsstatus.
+- Bei abgebrochenen Codex-Turns ohne Abschluss-Hook kann der Spinner bis zum Timeout von 15 Minuten bleiben.
+- Die Status-Hooks der Claude-Desktop-App und Hermes Desktop sowie das Verhalten auf mehreren Monitoren müssen noch manuell geprüft werden.
+- Der YAML-Editor unterstützt eingerückte Hook-Listen, leere Blöcke und Kommentare. Kompakte nichtleere Inline-Hook-Listen oder doppelte Hook-Schlüssel werden mit einer Fehlermeldung abgelehnt; die Datei bleibt erhalten.
