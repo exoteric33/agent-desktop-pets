@@ -71,7 +71,7 @@ namespace AiPets
             var steps = new List<Step>();
             try
             {
-                Autostart.Enabled = true;
+                Autostart.Choose(true);   // installing again also takes back an earlier "no"
                 steps.Add(new Step("Mit Windows starten", true, "an"));
             }
             catch (Exception ex)

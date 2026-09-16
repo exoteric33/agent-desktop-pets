@@ -58,7 +58,7 @@ namespace AiPets
         DateTime settingsStamp;
         Native.LayeredSurface surface;
         Graphics gfx;
-        int scale;                  // the size setting, 1 … 4
+        double size;                // the size all pets share, 1 … 4
         double zoom;                // screen pixels per sprite pixel at that size (rarely a whole number)
         Point anchor;               // bottom-centre of the pet on screen
         bool mirrored;
@@ -108,11 +108,11 @@ namespace AiPets
             Text = Ipc.PetTitle(pet.Id);
             Cursor = Cursors.Hand;
 
-            SetScale(settings.Scale > 0 ? settings.Scale : DefaultScale());
+            SetSize(settings.PetSize());
             anchor = settings.HasPosition ? Clamp(new Point(settings.X, settings.Y), true) : HomeAnchor();
             mirrored = WantsMirror(anchor, false);
             menu = BuildMenu();
-            Log.Write("start at " + anchor.X + "," + anchor.Y + " (home " + HomeAnchor().X + ", size " + scale
+            Log.Write("start at " + anchor.X + "," + anchor.Y + " (home " + HomeAnchor().X + ", size " + PetSettings.Number(size)
                 + ", zoom " + Math.Round(zoom, 3).ToString(CultureInfo.InvariantCulture)
                 + ", work area " + Screen.PrimaryScreen.WorkingArea + ")");
 
@@ -160,7 +160,7 @@ namespace AiPets
         protected override void OnHandleCreated(EventArgs e)
         {
             base.OnHandleCreated(e);
-            ApplyScale(scale);
+            ApplySize(size);
             timer.Start();
         }
 
@@ -197,17 +197,15 @@ namespace AiPets
             return new Rectangle(anchor.X - w / 2, anchor.Y - h, w, h);
         }
 
-        static int DefaultScale()
-        {
-            using (Graphics g = Graphics.FromHwnd(IntPtr.Zero))
-                return Math.Max(1, Math.Min(4, (int)Math.Round(2 * g.DpiX / 96f)));
-        }
-
-        /// <summary>"Back to the corner": pet.ini home is the gap from the screen's right edge to the cell's, in pixels at 1×.</summary>
+        /// <summary>
+        /// "Back to the corner": pet.ini home is the gap from the screen's right edge to the cell's, in pixels
+        /// at 1×. It grows with the shared size only, so the places stay put when one pet gets bigger.
+        /// </summary>
         Point HomeAnchor()
         {
             Rectangle wa = Screen.PrimaryScreen.WorkingArea;
-            return new Point(wa.Right - Px(atlas.CellW) / 2 - pet.Home * scale, wa.Bottom);
+            double shared = settings.Size > 0 ? settings.Size : PetSettings.DefaultSize();
+            return new Point(wa.Right - Px(atlas.CellW) / 2 - (int)Math.Round(pet.Home * shared), wa.Bottom);
         }
 
         Point Clamp(Point p, bool snapToTaskbar)
@@ -235,16 +233,16 @@ namespace AiPets
             return lookLeft != atlas.FacingLeft;
         }
 
-        /// <summary>Size setting and zoom: at size n every pet is n × SizeUnit screen pixels tall.</summary>
-        void SetScale(int newScale)
+        /// <summary>Size and zoom: at size n every pet is n × SizeUnit screen pixels tall.</summary>
+        void SetSize(double newSize)
         {
-            scale = newScale;
-            zoom = newScale * (double)SizeUnit / atlas.FigureHeight;
+            size = newSize;
+            zoom = newSize * SizeUnit / atlas.FigureHeight;
         }
 
-        void ApplyScale(int newScale)
+        void ApplySize(double newSize)
         {
-            SetScale(newScale);
+            SetSize(newSize);
             anchor = Clamp(anchor, false);
             if (gfx != null) gfx.Dispose();
             if (surface != null) surface.Dispose();
@@ -277,11 +275,11 @@ namespace AiPets
         {
             settingsStamp = Store.Stamp();
             PetSettings s = PetSettings.From(pet, Store.Load());
-            int newScale = s.Scale > 0 ? s.Scale : DefaultScale();
+            double newSize = s.PetSize();
             settings = s;
-            if (newScale != scale)
+            if (Math.Abs(newSize - size) > 0.001)
             {
-                ApplyScale(newScale);
+                ApplySize(newSize);
                 if (!s.HasPosition)
                     MoveTo(HomeAnchor(), true);
                 SavePosition();
@@ -664,7 +662,7 @@ namespace AiPets
                         continue;
                     var pet = new PetForm(info, null);
                     pets.Add(pet);
-                    pet.SetScale(2);
+                    pet.SetSize(2);
                     pet.mirrored = false;
                     width += pet.CanvasPxW;
                     height = Math.Max(height, pet.CanvasPxH);
@@ -865,10 +863,10 @@ namespace AiPets
             });
         }
 
+        /// <summary>Only the position: the size belongs to all pets and is written where it changes.</summary>
         void SavePosition()
         {
-            Store.Update(pet.Id, "x", PetSettings.Number(anchor.X), "y", PetSettings.Number(anchor.Y),
-                "scale", PetSettings.Number(scale));
+            Store.Update(pet.Id, "x", PetSettings.Number(anchor.X), "y", PetSettings.Number(anchor.Y));
             settings.HasPosition = true;
             settings.X = anchor.X;
             settings.Y = anchor.Y;
@@ -888,15 +886,20 @@ namespace AiPets
             var openApp = new ToolStripMenuItem("Desktop-App", null, delegate { SetMode("app"); });
             var openWebsite = new ToolStripMenuItem("Website", null, delegate { SetMode("website"); });
             opens.DropDownItems.AddRange(new ToolStripItem[] { openProgram, openApp, openWebsite });
-            var size = new ToolStripMenuItem("Größe");
+            // shared sizes (Tag double) and this pet's own share (Tag int), each under a grey heading
+            var sizes = new ToolStripMenuItem("Größe");
+            sizes.DropDownItems.Add(new ToolStripMenuItem("Alle Pets") { Enabled = false });
             for (int i = 1; i <= 4; i++)
             {
-                int s = i;
-                size.DropDownItems.Add(new ToolStripMenuItem(s + "×", null, delegate
-                {
-                    ApplyScale(s);
-                    SavePosition();
-                }) { Tag = s });
+                double s = i;
+                sizes.DropDownItems.Add(new ToolStripMenuItem(PetSettings.SizeText(s), null, delegate { ShareSize(s); }) { Tag = s });
+            }
+            sizes.DropDownItems.Add(new ToolStripSeparator());
+            sizes.DropDownItems.Add(new ToolStripMenuItem("Nur " + pet.Name) { Enabled = false });
+            foreach (int preset in new[] { 75, 100, 125, 150 })
+            {
+                int percent = preset;
+                sizes.DropDownItems.Add(new ToolStripMenuItem(PetSettings.PercentText(percent), null, delegate { OwnSize(percent); }) { Tag = percent });
             }
             var home = new ToolStripMenuItem("Zurück in die Ecke", null, delegate
             {
@@ -917,7 +920,7 @@ namespace AiPets
 
             strip.Items.AddRange(new ToolStripItem[]
             {
-                open, folder, opens, new ToolStripSeparator(), size, home, hide, new ToolStripSeparator(), prefs, quit,
+                open, folder, opens, new ToolStripSeparator(), sizes, home, hide, new ToolStripSeparator(), prefs, quit,
             });
             strip.Opening += delegate
             {
@@ -933,8 +936,15 @@ namespace AiPets
                 openApp.Visible = s.DesktopApp.Length > 0;   // only pets that know a desktop app
                 openApp.ToolTipText = AppText(s);
                 openWebsite.ToolTipText = s.Url;
-                foreach (ToolStripMenuItem item in size.DropDownItems)
-                    item.Checked = (int)item.Tag == scale;
+                double shared = s.Size > 0 ? s.Size : PetSettings.DefaultSize();
+                foreach (ToolStripItem item in sizes.DropDownItems)
+                {
+                    var entry = item as ToolStripMenuItem;
+                    if (entry != null && entry.Tag is double)
+                        entry.Checked = Math.Abs((double)entry.Tag - shared) < 0.001;
+                    else if (entry != null && entry.Tag is int)
+                        entry.Checked = (int)entry.Tag == s.Percent;
+                }
                 prefs.Visible = host != null;
             };
             strip.Closed += delegate { menuOpen = false; };
@@ -945,6 +955,32 @@ namespace AiPets
         {
             menuOpen = true;
             menu.Show(Cursor.Position);
+        }
+
+        /// <summary>A shared size from the menu, for all pets like the first slider in the settings.</summary>
+        void ShareSize(double shared)
+        {
+            Store.Update("app", "size", PetSettings.Number(shared));
+            TakeOwnChange();
+            foreach (PetInfo other in PetInfo.Discover())
+                if (other.Id != pet.Id)
+                    Ipc.PostToPet(other.Id, Ipc.CmdReload);
+        }
+
+        /// <summary>This pet's own share of the size, like the second slider.</summary>
+        void OwnSize(int percent)
+        {
+            Store.Update(pet.Id, "percent", percent == 100 ? null : PetSettings.Number(percent));
+            TakeOwnChange();
+        }
+
+        /// <summary>A size this pet wrote itself: apply it now instead of waiting for the file stamp.</summary>
+        void TakeOwnChange()
+        {
+            settingsStamp = Store.Stamp();
+            settings = PetSettings.From(pet, Store.Load());
+            ApplySize(settings.PetSize());
+            SavePosition();
         }
 
         /// <summary>"program", "app" or "website"; the pet.ini default is stored as no override.</summary>

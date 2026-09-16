@@ -20,15 +20,17 @@ Pixel-Art-Desktop-Pets für Windows, eins pro KI-Agent. Die Pets sitzen auf der 
 
    Mehrmals ausführen schadet nicht: Was schon stimmt, bleibt unverändert. Von jeder geänderten Datei liegt die vorige Fassung als `<datei>.bak-aipets` daneben. Agents, die gerade laufen, einmal neu starten, damit sie die Hooks laden.
 2. **Bedienen:** Im Infobereich der Taskleiste (bei den ausgeblendeten Symbolen hinter `^`) erscheint das aipets-Icon.
-   - **Linksklick:** Einstellungen. Dort kannst du Pets ein- und ausblenden, die Größe wählen und unter **„Klick öffnet“** zwischen **Programm**, **Desktop-App** und **Website** umschalten. Die Desktop-App gibt es bei Claude, Hermes und Astra.
-     - Größe: Bei gleicher Größe sind alle Pets gleich hoch, 1× = 162 px, 2× = 324 px usw. Die Pixel-Art wird dafür nur gestreckt, nicht verändert.
+   - **Linksklick:** Einstellungen. Dort kannst du Pets ein- und ausblenden, mit zwei Reglern die Größe wählen und unter **„Klick öffnet“** zwischen **Programm**, **Desktop-App** und **Website** umschalten. Die Desktop-App gibt es bei Claude, Hermes und Astra.
+     - **„Größe aller Pets“:** 1× bis 4× in Viertelschritten, für alle. Bei 100 % sind alle Pets gleich hoch: 1× = 162 px, 2× = 324 px usw.
+     - **„Größe von <Pet>“:** 50 % bis 200 % der gemeinsamen Größe, nur für dieses Pet. Dahinter steht, wie groß es damit ist, z. B. „125 % · 2,5×“. Stellst du danach die gemeinsame Größe um, behält das Pet seinen Anteil.
+     - Die Pets folgen beim Ziehen sofort. Die Pixel-Art wird nur gestreckt, nicht verändert.
      - Programm: Programm, Argumente, Terminal und Arbeitsordner.
      - Desktop-App: welche App gefunden wurde, mit Version und Ort. Mit „…“ wählst du stattdessen eine andere exe.
        - Claude öffnet die Claude-App, Astra die Codex-App (Windows nennt sie „ChatGPT“), Hermes die Hermes-Desktop-App.
        - Astra nimmt dafür `codex app`, ohne Terminalfenster. Das öffnet den Arbeitsordner als Workspace in der App (die Seite zeigt ihn deshalb an), und fehlt die App, öffnet es ihren Installer.
        - Hermes Desktop muss einmal gebaut werden. Solange sie fehlt, startet ein Klick `hermes desktop` im Terminal. Das baut die App (beim ersten Mal einige Minuten) und öffnet sie, danach startet sie direkt.
      - Website: der Link (nur http/https; `grok.com` wird automatisch zu `https://grok.com/`).
-     - Unten: „Mit Windows starten“.
+     - Unten: „Mit Windows starten“. Das ist von Anfang an an: aipets schaltet es beim Start selbst ein, auch nach dem Verschieben des Ordners. Schaltest du es aus, bleibt es aus.
    - **Rechtsklick:** Menü mit allen Pets, Autostart und Beenden.
 3. **Entfernen:** **`uninstall.cmd` doppelklicken.** Es beendet aipets, schaltet „Mit Windows starten“ aus und nimmt die Hooks wieder heraus. Danach kannst du den Ordner löschen, und `%APPDATA%\aipets` (Einstellungen, Log) auch.
 
@@ -38,7 +40,7 @@ Pixel-Art-Desktop-Pets für Windows, eins pro KI-Agent. Die Pets sitzen auf der 
 
 **Hintergrund:** Das Tray-Programm startet jedes Pet als eigenen Prozess (`aipets.exe --pet <id>`). Stürzt ein Pet ab oder wird es beendet, startet das Tray-Programm es neu. Beendest du das Tray-Programm, verschwinden auch die Pets.
 
-**Pet-Rechtsklick:** öffnen, Arbeitsordner (nur im Programm-Modus), „Klick öffnet“ → Programm / Desktop-App / Website, Größe, zurück in die Ecke, ausblenden, Einstellungen, aipets beenden.
+**Pet-Rechtsklick:** öffnen, Arbeitsordner (nur im Programm-Modus), „Klick öffnet“ → Programm / Desktop-App / Website, Größe (alle Pets 1× bis 4×, nur dieses Pet 75 % bis 150 %), zurück in die Ecke, ausblenden, Einstellungen, aipets beenden.
 
 Ein Klick startet Claude Code mit `--dangerously-skip-permissions`, Hermes mit `--yolo` und Codex mit `--dangerously-bypass-approvals-and-sandbox`. Gemini öffnet `https://gemini.google.com/app`, Grok `https://grok.com/`, beide im Standardbrowser. Das alles kannst du in den Einstellungen oder in `pets\<id>\pet.ini` ändern. Gemini CLI und Grok CLI sind nicht dabei; wer den Programm-Modus will, muss sie selbst installieren.
 

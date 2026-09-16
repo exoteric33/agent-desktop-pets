@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
+using System.Globalization;
 using System.IO;
 using System.Reflection;
 using System.Threading;
@@ -63,6 +64,12 @@ namespace AiPets
             foreach (PetInfo info in PetInfo.Discover())
                 Pets.Add(new PetProcess(info));
             ReloadIni();
+            if (!dryRun)
+            {
+                MoveSizesToApp();
+                try { Autostart.ApplyDefault(ini); }
+                catch (Exception ex) { Log.Write("autostart: " + ex.Message); }
+            }
 
             AppIcon = LoadAppIcon(new Size(32, 32));
             tray.Icon = LoadAppIcon(SystemInformation.SmallIconSize);
@@ -107,6 +114,58 @@ namespace AiPets
         {
             iniStamp = Store.Stamp();
             ini = Store.Load();
+        }
+
+        /// <summary>
+        /// Settings from before had a size per pet (scale). All pets share one now ([app] size): the most
+        /// common of the old ones (the larger on a tie). A pet that had another size keeps it as her own
+        /// percentage; the old keys go.
+        /// </summary>
+        void MoveSizesToApp()
+        {
+            if (ini.Get("app", "size") != null)
+                return;
+            double size = CommonOldSize(ini, Pets);
+            if (size == 0)
+                return;
+            Store.Update("app", "size", PetSettings.Number(size));
+            foreach (PetProcess p in Pets)
+            {
+                string old = ini.Get(p.Info.Id, "scale");
+                if (old == null)
+                    continue;
+                int percent = OldPercent(old, size);
+                Store.Update(p.Info.Id, "scale", null, "percent", percent == 100 ? null : PetSettings.Number(percent));
+            }
+            Log.Write("size " + PetSettings.Number(size) + " for all pets (was set per pet)");
+            ReloadIni();
+        }
+
+        /// <summary>An old per-pet size as a share of the new shared one, in 5 % steps; 100 if unreadable.</summary>
+        public static int OldPercent(string oldScale, double size)
+        {
+            double old;
+            if (!double.TryParse(oldScale, NumberStyles.Float, CultureInfo.InvariantCulture, out old) || old <= 0 || size <= 0)
+                return 100;
+            int percent = (int)Math.Round(old / size * 20) * 5;
+            return Math.Max(PetSettings.MinPercent, Math.Min(PetSettings.MaxPercent, percent));
+        }
+
+        /// <summary>The most common per-pet size (the larger on a tie), within the slider's range; 0 if there is none.</summary>
+        public static double CommonOldSize(Ini settings, List<PetProcess> pets)
+        {
+            var counts = new Dictionary<double, int>();
+            foreach (PetProcess p in pets)
+            {
+                double old;
+                if (double.TryParse(settings.Get(p.Info.Id, "scale"), NumberStyles.Float, CultureInfo.InvariantCulture, out old) && old > 0)
+                    counts[old] = (counts.ContainsKey(old) ? counts[old] : 0) + 1;
+            }
+            double size = 0;
+            foreach (KeyValuePair<double, int> kv in counts)
+                if (size == 0 || kv.Value > counts[size] || (kv.Value == counts[size] && kv.Key > size))
+                    size = kv.Key;
+            return size == 0 ? 0 : Math.Max(PetSettings.MinSize, Math.Min(PetSettings.MaxSize, size));
         }
 
         void Supervise()
@@ -236,6 +295,15 @@ namespace AiPets
             Store.Update(p.Info.Id, keyValues);
             ReloadIni();
             Ipc.PostToPet(p.Info.Id, Ipc.CmdReload);
+        }
+
+        /// <summary>The size slider: one size for all pets, applied right away.</summary>
+        public void SetSize(double size)
+        {
+            Store.Update("app", "size", PetSettings.Number(size));
+            ReloadIni();
+            foreach (PetProcess p in Pets)
+                Ipc.PostToPet(p.Info.Id, Ipc.CmdReload);
         }
 
         public void SendHome(PetProcess p)
@@ -372,7 +440,7 @@ namespace AiPets
                 menu.Items.Add(new ToolStripSeparator());
             var autostart = new ToolStripMenuItem("Mit Windows starten", null, delegate
             {
-                try { Autostart.Enabled = !Autostart.Enabled; }
+                try { Autostart.Choose(!Autostart.Enabled); }
                 catch (Exception ex) { Log.Write("autostart: " + ex.Message); }
             });
             try { autostart.Checked = Autostart.Enabled; }

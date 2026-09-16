@@ -28,7 +28,7 @@ Pixel-Art-Desktop-Pets für Windows, eins pro KI-Agent. Ein Tray-Programm (`aipe
 | `gemini` | Gemini | ins Chat eingefügtes Bild (nur im Repo) | Website gemini.google.com/app | `gemini` (CLI nicht installiert) | – | Google-„G“ statt „3.8 Flash“, gezeichnete Augen, winkt |
 | `grok` | Grok | `Desktop\grok-chan-pixel-ohne-tablet.png` | Website grok.com | `grok` (CLI nicht installiert) | – | xAI-Logo statt „grok“ (User-Wahl), zwinkert beim Hover wie im Bild, Peace-Zeichen wippt |
 
-Commits auf `main`: ClaudePet → aipets (Tray, Hermes) → Astra/Codex-Hooks → Gemini/Link-Pets → Grok und Programm/Website-Auswahl für alle → neues Grok-Aussehen → Ein-Klick-Installation → Desktop-App-Modus und gleich große Pets.
+Commits auf `main`: ClaudePet → aipets (Tray, Hermes) → Astra/Codex-Hooks → Gemini/Link-Pets → Grok und Programm/Website-Auswahl für alle → neues Grok-Aussehen → Ein-Klick-Installation → Desktop-App-Modus und gleich große Pets → Größen-Regler (alle und einzeln) und Autostart als Standard.
 
 Grok hatte zuerst eine andere Vorlage (`Desktop\grok-chan.png`: Brille, Tablet, Uhr). Der User hat danach nur das Aussehen durch `grok-chan-pixel-ohne-tablet.png` ersetzen lassen; alles andere (Link, Logo-Wahl, Effekte) blieb.
 
@@ -41,6 +41,19 @@ Grok hatte zuerst eine andere Vorlage (`Desktop\grok-chan.png`: Brille, Tablet, 
   - `install.cmd` als `--quiet`-Kopie.
   - Auf dem Rechner des Users war `--install` ein No-op (Hashes gleich), weil schon alles eingerichtet war.
 - **Nicht getestet:** Doppelklick mit Fenstern und `--uninstall` auf dem echten Rechner (würde seine Hooks entfernen).
+
+**Größen-Regler und Autostart als Standard** (Wunsch des Users):
+- **Größe:** Einstellungen → zwei Regler, beide gelten sofort.
+  - „Größe aller Pets“: 1× bis 4× in Viertelschritten, gespeichert in `[app] size`.
+  - „Größe von <Pet>“: 50–200 % davon für dieses Pet, gespeichert als `[id] percent`. Der User wollte die Pets auch einzeln größer oder kleiner machen.
+  - Die Pet-Größe ist `size × percent`, begrenzt auf 0,5–6. Das Pet-Menü bietet beides als Stufen an.
+  - Beim ersten Start hat das Tray die alten Werte `scale` übernommen, beim User 2× für alle (also kein `percent`).
+- **Autostart:** „Mit Windows starten“ ist standardmäßig an. Das Tray schaltet es beim Start ein, außer der User hat es ausgeschaltet (`[app] autostart=0`). Test-exes und `--dry-run` fassen es nie an.
+- **Getestet:**
+  - 39 Prüfungen: Größe und Anteil lesen, Grenzen, Pet-Größe, alte Werte übernehmen (auch als Anteil), Anzeige.
+    - Dazu, dass der Autostart-Standard die Registry für eine Test-exe nicht anfasst (Run-Wert vorher und nachher gleich).
+  - Die 70 Desktop-App-Prüfungen erneut. Einstellungsseite als PNG.
+- **Nicht getestet:** die Regler von Hand ziehen, das Pet-Menü.
 
 **Alle Pets gleich groß** (Wunsch des Users: nach Pixelhöhe gleich skalieren, an den Bildern sonst nichts ändern):
 - Größe n heißt jetzt: Die Figur ist n × 162 px hoch (`SizeUnit` in `PetForm`, die höchste Figur Grok). Jedes Pet bekommt dafür einen eigenen Zoom aus seiner Figurenhöhe (`Atlas.FigureHeight`, gemessen in `normal_0`). Details in PET-BAUANLEITUNG, Abschnitt 6, „Größe“.
@@ -103,14 +116,16 @@ aipets.exe --uninstall --quiet                   # NIE auf dem Rechner des Users
 ## 4. Arbeitsweise (so will es der User)
 
 - **Sprache:** mit dem User Deutsch. UI-Texte und Doku Deutsch. Code-Kommentare und Commit-Messages Englisch.
-- **Commits:** Englisch, eine Zusammenfassungszeile plus Stichpunkte. **Keine KI-Attribution** (kein `Co-Authored-By`, kein „Generated with …“). Direkt auf `main` committen und pushen, wenn der User „commit/push“ sagt. Das Repo ist privat.
+- **Commits:** Englisch, eine Zusammenfassungszeile plus Stichpunkte. **Keine KI-Attribution** (kein `Co-Authored-By`, kein „Generated with …“). Das Repo ist privat.
+  - Automatisch (Wunsch des Users seit 2026-09-16): Ist eine Änderung fertig, getestet, gebaut und die Doku nachgezogen, direkt auf `main` committen und pushen, ohne nachzufragen. Danach kurz sagen, was committet wurde.
+  - Halbfertiges oder Ungetestetes nicht committen.
 - **Den User nicht stören:** Er arbeitet parallel am PC.
   - Nie seine Maus bewegen, keine Test-Terminals oder Browserfenster öffnen.
   - Testen per `--snapshot`, `--command`, `--status`, `--dry-run` und Test-exe. Screenshots nur lesend (BitBlt).
   - `build.ps1` startet aipets neu; das ist üblich und in Ordnung.
-- **Positionen gehören dem User:** `x`, `y`, `scale` in `%APPDATA%\aipets\settings.ini` nicht zurücksetzen. Er zieht die Pets oft selbst herum.
+- **Positionen und Größe gehören dem User:** `x`, `y`, `percent` und `[app] size` in `%APPDATA%\aipets\settings.ini` nicht zurücksetzen. Er zieht die Pets oft selbst herum und stellt die Größe um (am 2026-09-16 erst 4×, dann 2×).
   - Für ein neues Pet einen freien Startplatz ausrechnen (sichtbare Pixel aus dem Atlas × Zoom, Zoom = Größe × 162 / Figurenhöhe) und nur dann einen Abschnitt schreiben, wenn der Home-Platz belegt ist. Immer unter dem Mutex `Local\aipets.settings`.
-  - Soll `scale` doch einmal geändert werden (nur auf ausdrücklichen Wunsch), vorher die aktuelle `settings.ini` lesen. Der User stellt Größe und Position oft selbst um, während ein Agent arbeitet.
+  - Soll die Größe doch einmal geändert werden (nur auf ausdrücklichen Wunsch), vorher die aktuelle `settings.ini` lesen. Der User stellt Größe und Position oft selbst um, während ein Agent arbeitet.
   - Danach jedem Pet `Ipc.PostToPet(id, Ipc.CmdReload)` schicken, sonst kann ein Ziehen die Änderung überschreiben (PET-BAUANLEITUNG, Abschnitt 9).
 - **Optik:** Die Pets sollen so gut animiert sein wie die bestehenden. Gesichter, Logos und Details immer mit Vorschau-PNGs prüfen, nicht blind eintragen.
   - Schriftzüge auf Shirts wurden jeweils durch das Logo ersetzt. Logos aus echten Vektorpfaden rastern.
@@ -150,8 +165,13 @@ aipets.exe --uninstall --quiet                   # NIE auf dem Rechner des Users
 - Gemini und Grok haben keine Statusanzeige; Websites liefern keine Hooks. Mit einer installierten CLI im Programm-Modus könnte man eine Quelle ergänzen (neue `case` in `HookCommand.Run`, `status=` in der pet.ini).
 - Codex meldet `Stop` nicht bei abgebrochenen Turns: Der Spinner hält dann bis zu 15 min (siehe PET-BAUANLEITUNG, Abschnitt 7).
 - `src/Settings.cs` ist ungenutzte Altlast aus ClaudePet (Namespace `ClaudePet`) und könnte gelöscht werden.
-- Home-Positionen gelten in Pixeln bei 1× und passen, solange alle Pets dieselbe Größe haben. Bei gemischten Größen können sich „Zurück in die Ecke“-Plätze überlappen; bei 4× reicht ein 1920 px breiter Bildschirm nicht für alle fünf.
-- Die Größe ist weiter pro Pet einstellbar. Stellt der User eines um, sind die Pets wieder unterschiedlich groß (gewollt, aber ggf. eine gemeinsame Größe anbieten).
+- Home-Positionen gelten in Pixeln bei 1×. Ab etwa 3,5× reicht ein 1920 px breiter Bildschirm nicht mehr für alle fünf, dann überlappen die „Zurück in die Ecke“-Plätze. Eine Idee dafür: „Alle aufreihen“ mit Umbruch oder kleinerem Abstand.
+- Weitere Ideen, die der User gut fand, aber noch nicht bestellt hat:
+  - Klick auf ein wartendes Pet holt die Sitzung nach vorn.
+  - Sitzungsliste im Pet-Menü.
+  - Hinweis im Tray, wenn die Pets im Vollbild versteckt sind.
+  - Mittelklick/Shift-Klick für die anderen Modi.
+  - Cursor-Pet.
 - Die Grok-CLI-Vorgabe `program=grok` / `%APPDATA%\npm\grok.cmd` ist eine Annahme. Bei einer echten Installation Pfad und Argumente prüfen.
 - **Desktop-App-Modus:**
   - Den ersten echten Klick auf Claude-App, Codex-App und `hermes desktop` macht der User. Kommt eine App dabei nicht nach vorn, liegt es am Vordergrundrecht (siehe PET-BAUANLEITUNG, Abschnitt 4, `app`).

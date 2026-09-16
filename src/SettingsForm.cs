@@ -29,7 +29,9 @@ namespace AiPets
         readonly Label appName = new Label(), appWhere = new Label();
         readonly LinkLabel setupLink = new LinkLabel();
         readonly CheckBox showBox = new CheckBox(), autostartBox = new CheckBox();
-        readonly RadioButton[] sizes = new RadioButton[4];
+        readonly TrackBar sizeBar = new TrackBar();      // all pets, quarter steps: 4 = 1× … 16 = 4×
+        readonly TrackBar petSizeBar = new TrackBar();   // this pet, 5 % steps: 10 = 50 % … 40 = 200 %
+        readonly Label sizeValue = new Label(), petSizeLabel = new Label(), petSizeValue = new Label();
         readonly RadioButton programMode = new RadioButton(), appMode = new RadioButton(), websiteMode = new RadioButton();
         readonly TextBox programBox = new TextBox(), argsBox = new TextBox(), dirBox = new TextBox(), urlBox = new TextBox();
         readonly ComboBox shellBox = new ComboBox();
@@ -64,7 +66,7 @@ namespace AiPets
             AutoScaleMode = AutoScaleMode.Dpi;
             Font = new Font("Segoe UI", 9F);
             Text = "aipets – Einstellungen";
-            ClientSize = new Size(700, 504);
+            ClientSize = new Size(700, 540);
             FormBorderStyle = FormBorderStyle.FixedSingle;
             MaximizeBox = false;
             StartPosition = FormStartPosition.CenterScreen;
@@ -94,9 +96,9 @@ namespace AiPets
             autostartBox.Location = new Point(20, 18);
             autostartBox.CheckedChanged += delegate
             {
-                if (loading)
+                if (loading || host == null)
                     return;
-                try { Autostart.Enabled = autostartBox.Checked; }
+                try { Autostart.Choose(autostartBox.Checked); }
                 catch (Exception ex) { Log.Write("autostart: " + ex.Message); }
             };
 
@@ -159,24 +161,35 @@ namespace AiPets
             };
             page.Controls.AddRange(new Control[] { avatar, title, state, showBox });
 
+            // two sliders, both live: the pets follow while a slider moves
             int y = 128;
-            AddLabel(page, "Größe", y);
-            for (int i = 0; i < sizes.Length; i++)
+            AddLabel(page, "Größe aller Pets", y);
+            SetupSlider(page, sizeBar, sizeValue, y, (int)(PetSettings.MinSize * 4), (int)(PetSettings.MaxSize * 4), 4);
+            sizeBar.ValueChanged += delegate
             {
-                int n = i + 1;
-                var radio = new RadioButton { Text = n + "×", AutoSize = true, Location = new Point(140 + i * 58, y - 1) };
-                radio.CheckedChanged += delegate
-                {
-                    if (!loading && radio.Checked && current != null && host != null)
-                        host.ChangeSetting(current, "scale", PetSettings.Number(n));
-                };
-                sizes[i] = radio;
-                page.Controls.Add(radio);
-            }
+                ShowSizes();
+                if (!loading && host != null)
+                    host.SetSize(sizeBar.Value / 4.0);
+            };
+
+            y += 36;
+            petSizeLabel.AutoSize = true;
+            petSizeLabel.Location = new Point(22, y);
+            petSizeLabel.ForeColor = Color.FromArgb(40, 40, 40);
+            page.Controls.Add(petSizeLabel);
+            SetupSlider(page, petSizeBar, petSizeValue, y, PetSettings.MinPercent / 5, PetSettings.MaxPercent / 5, 10);
+            petSizeBar.ValueChanged += delegate
+            {
+                ShowSizes();
+                if (loading || current == null || host == null)
+                    return;
+                int percent = petSizeBar.Value * 5;
+                host.ChangeSetting(current, "percent", percent == 100 ? null : PetSettings.Number(percent));
+            };
 
             y += 36;
             AddLabel(page, "Klick öffnet", y);
-            // own panel: radio buttons in the page itself would share one group with the sizes
+            // own panel: these radio buttons form one group, apart from anything else on the page
             var modes = new Panel { Location = new Point(136, y - 4), Size = new Size(336, 24) };
             programMode.Text = "Programm";
             appMode.Text = "Desktop-App";
@@ -329,6 +342,38 @@ namespace AiPets
             return page;
         }
 
+        /// <summary>A slider in the value column with its value label behind it; ticks every tickEvery steps.</summary>
+        static void SetupSlider(Control page, TrackBar bar, Label value, int y, int min, int max, int tickEvery)
+        {
+            bar.AutoSize = false;
+            bar.Location = new Point(134, y - 6);
+            bar.Size = new Size(240, 34);
+            bar.BackColor = Color.White;
+            bar.Minimum = min;
+            bar.Maximum = max;
+            bar.SmallChange = 1;
+            bar.LargeChange = tickEvery;
+            bar.TickFrequency = tickEvery;
+            bar.TickStyle = TickStyle.BottomRight;
+            value.AutoSize = true;
+            value.Location = new Point(380, y);
+            page.Controls.AddRange(new Control[] { bar, value });
+        }
+
+        /// <summary>The values behind the sliders: "2×" and "125 % · 2,5×", the size this pet ends up at.</summary>
+        void ShowSizes()
+        {
+            double shared = sizeBar.Value / 4.0;
+            int percent = petSizeBar.Value * 5;
+            sizeValue.Text = PetSettings.SizeText(shared);
+            petSizeValue.Text = PetSettings.PercentText(percent) + " · " + PetSettings.SizeText(Math.Round(PetSettings.PetSize(shared, percent), 2));
+        }
+
+        static void SetSlider(TrackBar bar, double value)
+        {
+            bar.Value = Math.Max(bar.Minimum, Math.Min(bar.Maximum, (int)Math.Round(value)));
+        }
+
         static Label AddLabel(Control page, string text, int y)
         {
             var label = new Label { Text = text, AutoSize = true, Location = new Point(22, y), ForeColor = Color.FromArgb(40, 40, 40) };
@@ -429,9 +474,10 @@ namespace AiPets
                 }
                 state.Text = host != null ? host.StateText(p) : "–";
                 showBox.Checked = s.Enabled;
-                int scale = s.Scale > 0 ? s.Scale : 2;
-                for (int i = 0; i < sizes.Length; i++)
-                    sizes[i].Checked = i + 1 == scale;
+                petSizeLabel.Text = "Größe von " + p.Info.Name;
+                SetSlider(sizeBar, (s.Size > 0 ? s.Size : PetSettings.DefaultSize()) * 4);
+                SetSlider(petSizeBar, s.Percent / 5.0);
+                ShowSizes();
                 if (!programBox.Focused) programBox.Text = s.Program;
                 if (!argsBox.Focused) argsBox.Text = s.Args;
                 if (!dirBox.Focused) dirBox.Text = s.WorkDir;

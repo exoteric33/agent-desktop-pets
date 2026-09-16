@@ -199,6 +199,27 @@ namespace AiPets
                 }
             }
         }
+
+        /// <summary>The user's choice: switches autostart and remembers a "no" ([app] autostart=0 in settings.ini).</summary>
+        public static void Choose(bool on)
+        {
+            Enabled = on;
+            Store.Update("app", "autostart", on ? null : "0");
+        }
+
+        /// <summary>
+        /// Autostart is on by default: the tray switches it on when it starts (also after the folder
+        /// moved) unless the user switched it off. Never for a test copy like aipets-test.exe.
+        /// </summary>
+        public static void ApplyDefault(Ini settings)
+        {
+            if (settings.Get("app", "autostart") == "0"
+                || !string.Equals(Path.GetFileName(App.ExePath), App.Name + ".exe", StringComparison.OrdinalIgnoreCase)
+                || Enabled)
+                return;
+            Enabled = true;
+            Log.Write("autostart switched on (default)");
+        }
     }
 
     static class Log

@@ -15,6 +15,8 @@ Der Einstieg für Agents (Arbeitsweise, Stand, lokale Einrichtung) steht in [AGE
   - Es startet jedes eingeschaltete Pet als eigenen Prozess (`aipets.exe --pet <id> --host <pid>`).
   - Stürzt ein Pet ab oder wird es beendet, startet es das Pet neu. Wartezeiten steigen von 1 s auf 60 s, nach 4 Abstürzen zeigt es einen Hinweis.
   - Autostart: `HKCU\...\CurrentVersion\Run`, Wert `aipets`.
+    - Er ist standardmäßig an: Das Tray schaltet ihn beim Start ein (`Autostart.ApplyDefault`), auch wenn ein alter Pfad drinsteht.
+    - Ausnahmen: Der User hat ihn ausgeschaltet (`[app] autostart=0`, geschrieben von `Autostart.Choose`), die exe heißt nicht `aipets.exe` (Test-Kopien), oder `--dry-run` läuft.
 - **Pet-Fenster:**
   - Die Figur steht bzw. sitzt unten auf der Taskleiste, immer im Vordergrund. Transparente Stellen lassen Klicks durch.
   - **Maus drüber:** Hover-Gesicht plus Sprechblase mit Prompt.
@@ -76,7 +78,9 @@ aipets\
 ```
 
 Laufzeitdaten liegen in `%APPDATA%\aipets\`:
-- `settings.ini`: ein Abschnitt pro Pet (`x`, `y`, `scale`, `enabled`, `workdir`, `mode`, `program`, `args`, `shell`, `app`, `url`), geschrieben von Tray und Pets, immer unter dem Mutex `Local\aipets.settings`
+- `settings.ini`: `[app]` (`size` für alle Pets, `autostart=0` nach einem „aus“) und ein Abschnitt pro Pet (`x`, `y`, `percent`, `enabled`, `workdir`, `mode`, `program`, `args`, `shell`, `app`, `url`), geschrieben von Tray und Pets, immer unter dem Mutex `Local\aipets.settings`
+  - Ältere Dateien haben `scale` pro Pet. Das Tray übernimmt beim Start den häufigsten Wert (bei Gleichstand den größeren) als `[app] size` und löscht die alten Schlüssel (`TrayHost.MoveSizesToApp`).
+  - Ein Pet mit anderer alter Größe bekommt sie als `percent` (5-%-Schritte, 50–200).
 - `aipets.log`: jede Zeile mit `[tray]`, `[claude]`, `[hook hermes]` …
 - `status\<quelle>\*.txt`
 
@@ -93,10 +97,11 @@ Laufzeitdaten liegen in `%APPDATA%\aipets\`:
   - Exit-Code 0, wenn alles geklappt hat oder ein Agent nur nicht installiert ist.
   - `--quiet` lässt alle Fenster weg; die Zusammenfassung steht dann auf stdout und im Log (`[install]`).
 - **`uninstall.cmd`:** `aipets.exe --uninstall` fragt nach, beendet das Tray per IPC (`quit`), schaltet den Autostart aus und entfernt die Hooks. `%APPDATA%\aipets` bleibt.
+  - Das merkt sich kein „aus“: Startet jemand aipets danach wieder, ist der Autostart wieder an (Standard). `--install` nimmt ein früheres „aus“ zurück.
 - **Testen, ohne den Desktop anzufassen:**
   - **Test-exe:** mit demselben `csc`-Aufruf wie in `build.ps1`, aber `/out:aipets-test.exe`, in den aipets-Ordner kompilieren (dann findet sie `pets\`). Das laufende aipets bleibt unberührt. Danach löschen.
   - `aipets.exe --snapshot <ordner> [--pet id]` rendert jedes Pet in allen Zuständen (idle, hover, look, sleep, click, working, waiting, done, beide Blickrichtungen) als PNG, in ganzen 3×-Pixeln.
-    - `lineup.png`: alle Pets bei Größe 2 nebeneinander auf einer Grundlinie. Jeder Kopf muss die obere Linie berühren (2 × 162 px über dem Boden).
+    - `lineup.png`: alle Pets bei Größe 2 (ohne ihren eigenen Anteil) nebeneinander auf einer Grundlinie. Jeder Kopf muss die obere Linie berühren (2 × 162 px über dem Boden).
     - Click und working enthalten zufällige Funken und sind bei jedem Lauf anders, alle anderen Bilder bleiben byte-gleich.
     - Dazu kommt das Einstellungsfenster, mit `--pet` auf der Seite dieses Pets: `settings.png` im gespeicherten Modus, `settings-program.png`, `settings-app.png` (nur mit Desktop-App) und `settings-website.png`.
   - `aipets.exe --command <id> [--mode program|app|website]` gibt aus, was ein Klick starten würde (Terminal-Befehl, Desktop-App oder Link). `--mode` ändert dabei nichts an `settings.ini`. Fehler (Programm nicht gefunden) stehen in der Ausgabe, Exit-Code 1.
@@ -240,7 +245,11 @@ anim <name> <sprite> <sprite> …           # optional: burst, twinkle*, z, spin
   - WinForms-Form mit `WS_EX_LAYERED | TOOLWINDOW | TOPMOST | NOACTIVATE`.
   - Gezeichnet wird in einen premultiplied 32-Bit-DIB, angezeigt per `UpdateLayeredWindow`.
   - `WM_MOUSEACTIVATE → MA_NOACTIVATE`: Anklicken klaut keinen Fokus.
-- **Größe:** Bei Größe n ist jedes Pet n × 162 px hoch (`SizeUnit`, die höchste Figur: Grok), egal wie viele Pixel ihr Sprite hat. Alle Pets gleicher Größe sind also gleich hoch.
+- **Größe:** Bei Größe n ist jedes Pet n × 162 px hoch (`SizeUnit`, die höchste Figur: Grok), egal wie viele Pixel ihr Sprite hat.
+  - n = gemeinsame Größe (`[app] size`, 1 bis 4, auch Zwischenwerte) × eigener Anteil des Pets (`[id] percent`, 50–200, Standard 100), begrenzt auf 0,5 bis 6 (`PetSettings.PetSize`).
+  - Ohne `percent` sind also alle Pets gleich hoch. Ohne `size` gilt `PetSettings.DefaultSize()`: 2 bei 96 dpi, mehr bei skalierten Anzeigen.
+  - Ändern geht über die beiden Regler (`TrayHost.SetSize` schickt allen Pets sofort `CmdReload`, `percent` geht über `ChangeSetting`) oder über das Pet-Menü (`ShareSize`, `OwnSize`). Beim Loslassen speichern Pets nur `x`/`y`.
+  - `home` wächst nur mit der gemeinsamen Größe, damit die Plätze stehen bleiben, wenn ein Pet größer wird.
   - Figurenhöhe = Zeilen vom obersten bis zum untersten sichtbaren Pixel in `normal_0` (`Atlas.FigureHeight`): Claude 118, Astra 120, Gemini 130, Hermes 157, Grok 162.
   - `zoom = n × 162 / Figurenhöhe` Bildschirmpixel pro Sprite-Pixel, bei 2×: Claude 2,75, Astra 2,7, Gemini 2,49, Hermes 2,06, Grok 2.
   - Weil 162 die höchste Figur ist, liegt `zoom` schon bei 1× nie unter 1, kein Sprite-Pixel geht verloren.
@@ -253,15 +262,18 @@ anim <name> <sprite> <sprite> …           # optional: burst, twinkle*, z, spin
   - Website-Modus: ein Shell-Execute-Start des geprüften Links.
   - Desktop-App-Modus: erst `appcommand` ohne Fenster (`CreateNoWindow` kennzeichnet das für `Launch`), dann die gefundene App (Abschnitt 4, `app`), dann `appfallback` im Terminal, sonst eine Meldung.
   - Programm-Modus (`TerminalStartInfo`): `wt.exe` mit frischer Logon-Umgebung.
-- **Einstellungsfenster:** 700×504, eine Seite pro Pet.
-  - Zeilen: Größe, Klick öffnet, dann Programm-Zeilen (`programRows`), App-Zeilen (`appRows`) oder Website-Zeilen (`linkRows`), Statusanzeige, Buttons.
+- **Einstellungsfenster:** 700×540, eine Seite pro Pet.
+  - Zeilen: Größe aller Pets, Größe von <Pet>, Klick öffnet, dann Programm-Zeilen (`programRows`), App-Zeilen (`appRows`) oder Website-Zeilen (`linkRows`), Statusanzeige, Buttons.
+  - Zwei `TrackBar`s (`SetupSlider`), jeder Schritt gilt sofort:
+    - „Größe aller Pets“: 4 bis 16, also Viertelschritte von 1× bis 4×, Striche bei ganzen Größen. Daneben der Wert („2,5×“).
+    - „Größe von <Pet>“: 10 bis 40, also 5-%-Schritte von 50 % bis 200 %, Striche alle 50 %. Daneben Anteil und Ergebnis („125 % · 2,5×“, `ShowSizes`).
   - Der Arbeitsordner (`folderRows`) steht im Programm-Modus und im Desktop-App-Modus, wenn `appcommand` gilt (`Launcher.AppViaProgram`).
   - „Desktop-App“ steht nur bei Pets mit `app=`, sonst rückt „Website“ an seine Stelle (Abstand aus `PreferredSize`, damit es bei jeder DPI passt).
   - Jede Änderung wird sofort gespeichert (`TrayHost.ChangeSetting` → `settings.ini` → Nachricht an das Pet).
   - **Statusanzeige:** `HookText` sucht in der Config des Agents nach dem Pfad dieser exe, so geschrieben, wie er dort steht (JSON: `\\`; YAML/PowerShell: `''`).
     - Texte: „✓ Hooks eingerichtet“, „Keine Hooks in …“ oder „Hooks rufen eine andere aipets.exe auf“.
     - Bei den letzten beiden erscheint der Link „Hooks einrichten“ (`Setup.Hooks(quelle, App.ExePath, true)`, Ergebnis als Meldung).
-- **Rechtsklick-Menü des Pets:** öffnen, Ordner (im Programm-Modus und bei einer App über `appcommand`), Klick öffnet → Programm/Desktop-App/Website, Größe, zurück in die Ecke, ausblenden, Einstellungen, beenden.
+- **Rechtsklick-Menü des Pets:** öffnen, Ordner (im Programm-Modus und bei einer App über `appcommand`), Klick öffnet → Programm/Desktop-App/Website, Größe (Gruppe „Alle Pets“ 1×–4×, Gruppe „Nur <Pet>“ 75–150 %), zurück in die Ecke, ausblenden, Einstellungen, beenden.
   - „Desktop-App“ gibt es nur bei Pets mit `app=`. Der Tooltip zeigt die gefundene App oder was ein Klick ohne sie tut.
 - **Tray ⇄ Pet:**
   - Pets heißen `aipets.pet.<id>` (Fenstertitel), das Tray-Fenster `aipets.host`.
@@ -437,9 +449,10 @@ anim <name> <sprite> <sprite> …           # optional: burst, twinkle*, z, spin
 - **Premultiplied Alpha:** Für `UpdateLayeredWindow` in ein `Format32bppPArgb`-Bitmap über dem DIB zeichnen, nicht `GetHbitmap()` pro Frame.
 - **`DrawImageUnscaled`** skaliert nach der DPI des PNG. Immer mit expliziten Pixel-Rechtecken zeichnen.
 - **Testen, ohne den User zu stören:** nicht seine Maus bewegen. `--snapshot`, `--command`, `--status`, `--dry-run` genügen. Screenshots nur lesend per BitBlt.
-- **`settings.ini` von außen ändern:** Ein Pet speichert bei jedem Loslassen `x`, `y` und seine Größe `scale` aus dem Speicher. Es liest die Datei aber nur jede Sekunde neu (Zeitstempel).
-  - Wer von außen `scale` ändert und das Pet nicht benachrichtigt, verliert die Änderung, wenn der User es in dieser Sekunde loslässt. So ist es passiert.
-  - Deshalb nach `Store.Update` immer `Ipc.PostToPet(id, Ipc.CmdReload)` schicken, wie `TrayHost.ChangeSetting` es tut.
+- **`settings.ini` von außen ändern:** Pets lesen die Datei nur jede Sekunde neu (Zeitstempel). Nach `Store.Update` deshalb `Ipc.PostToPet(id, Ipc.CmdReload)` schicken, wie `TrayHost.ChangeSetting` es tut.
+  - Früher speicherte ein Pet beim Loslassen auch seine Größe aus dem Speicher. Eine Größe, die ein Skript gerade von außen gesetzt hatte, ging so verloren.
+  - Seit die Größe für alle gilt, schreiben Pets beim Loslassen nur noch `x`/`y`.
+- **Autostart nur für die echte exe:** Eine Test-exe, die als Tray startet, würde sonst den Autostart auf sich umbiegen und beim Löschen kaputt hinterlassen. `ApplyDefault` prüft deshalb den Dateinamen `aipets.exe`.
 - **Snapshots schreiben nichts:** Die `PetForm`s dort werden nie angezeigt. Ohne Fenster-Handle gibt es beim `Dispose` kein `FormClosed`, also auch kein `SavePosition`.
 - **Pet „fehlt“ auf dem Desktop:** Erst Fensterliste und `settings.ini` prüfen. Der User verschiebt die Pets gern selbst, manchmal gleich nach dem Start an den Rand.
 - **Ins Chat eingefügte Bilder können das falsche sein** (einmal kam das Gemini-Bild statt Grok): Hash mit bisherigen Vorlagen vergleichen und auf dem Desktop nach der passenden Datei schauen.

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Globalization;
 using System.IO;
 
@@ -99,8 +100,13 @@ namespace AiPets
     /// <summary>A pet's effective settings: the pet.ini defaults overlaid with its section in settings.ini.</summary>
     sealed class PetSettings
     {
+        public const double MinSize = 1, MaxSize = 4;
+        public const int MinPercent = 50, MaxPercent = 200;
+        const double MinPetSize = 0.5, MaxPetSize = 6;   // 6 × 162 px still fits a 1080p screen
+
         public bool Enabled;
-        public int Scale;           // 0 = pick from display DPI
+        public double Size;         // shared by all pets ([app] size), 1 … 4; 0 = pick from display DPI
+        public int Percent;         // this pet's size in percent of the shared one ([id] percent), 50 … 200
         public bool HasPosition;
         public int X, Y;            // bottom-centre of the pet in screen pixels
         public string WorkDir, Program, Args, Shell, Url, DesktopApp, Mode;
@@ -128,7 +134,8 @@ namespace AiPets
             string id = pet.Id;
             var s = new PetSettings();
             s.Enabled = ini.Get(id, "enabled") != "0";
-            s.Scale = Math.Max(0, Math.Min(4, ini.GetInt(id, "scale", 0)));
+            s.Size = SizeOf(ini, id);
+            s.Percent = Math.Max(MinPercent, Math.Min(MaxPercent, ini.GetInt(id, "percent", 100)));
             s.HasPosition = ini.Get(id, "x") != null && ini.Get(id, "y") != null;
             s.X = ini.GetInt(id, "x", 0);
             s.Y = ini.GetInt(id, "y", 0);
@@ -158,9 +165,57 @@ namespace AiPets
             return mode == "website" || mode == "app" ? mode : "program";
         }
 
+        /// <summary>
+        /// The size all pets share ([app] size). Older settings had one per pet (scale): the tray moves
+        /// it over when it starts, a pet started on its own still reads it.
+        /// </summary>
+        static double SizeOf(Ini ini, string id)
+        {
+            double size;
+            string text = ini.Get("app", "size") ?? ini.Get(id, "scale");
+            if (text == null || !double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out size) || size <= 0)
+                return 0;
+            return Math.Max(MinSize, Math.Min(MaxSize, size));
+        }
+
+        /// <summary>The size this pet is shown at: the shared one (or the display default) times her own percentage.</summary>
+        public double PetSize()
+        {
+            return PetSize(Size > 0 ? Size : DefaultSize(), Percent);
+        }
+
+        public static double PetSize(double shared, int percent)
+        {
+            return Math.Max(MinPetSize, Math.Min(MaxPetSize, shared * percent / 100.0));
+        }
+
+        /// <summary>The size without a setting: 2 on a 96-dpi display, more on scaled ones.</summary>
+        public static double DefaultSize()
+        {
+            using (Graphics g = Graphics.FromHwnd(IntPtr.Zero))
+                return Math.Max(MinSize, Math.Min(MaxSize, Math.Round(2 * g.DpiX / 96.0)));
+        }
+
+        /// <summary>"2,5×"</summary>
+        public static string SizeText(double size)
+        {
+            return size.ToString("0.##", CultureInfo.InvariantCulture).Replace('.', ',') + "×";
+        }
+
+        /// <summary>"125 %"</summary>
+        public static string PercentText(int percent)
+        {
+            return Number(percent) + " %";
+        }
+
         public static string Number(int n)
         {
             return n.ToString(CultureInfo.InvariantCulture);
+        }
+
+        public static string Number(double n)
+        {
+            return n.ToString("0.##", CultureInfo.InvariantCulture);
         }
     }
 }
