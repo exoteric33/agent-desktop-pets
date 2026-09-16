@@ -254,8 +254,10 @@ anim <name> <sprite> <sprite> …           # optional: burst, twinkle*, z, spin
     - Oben die Höhe des Arbeitsbereichs des Bildschirms, auf dem das Pet steht (`PetForm.FitScreen`). Ein Pet kann also genau bildschirmhoch werden, nie höher.
     - `FitHeight` prüft das beim Start, beim Neuladen, nach dem Loslassen (anderer Bildschirm) und bei Anzeigeänderungen.
   - **Ändern:**
-    - Über die beiden Regler: `TrayHost.SetHeight` schickt allen Pets sofort `CmdReload`, die eigene Höhe geht über `ChangeSetting`.
+    - Über die beiden Regler: Die eigene Höhe geht über `ChangeSetting`. `TrayHost.SetHeight` schickt allen Pets sofort `CmdReload`.
     - Oder über das Pet-Menü (`SetSharedHeight`, `SetOwnHeight`).
+    - **Die Höhe aller Pets gilt für alle** (Wunsch des Users): `PetSettings.ShareHeight` setzt `[app] height` und löscht dabei jede eigene `height`. Das Pet springt also z. B. von 700 auf 324 px.
+    - Beides steht in einem Schreibvorgang (`Store.Change`, liest, ändert und schreibt die ganze Datei unter dem Mutex; `Store.Update` nutzt es auch).
     - Beim Loslassen speichern Pets nur `x`/`y`.
   - `home` wächst nur mit der Höhe aller Pets, damit die Plätze stehen bleiben, wenn ein Pet eine eigene hat.
   - **Zoom:**
@@ -274,7 +276,7 @@ anim <name> <sprite> <sprite> …           # optional: burst, twinkle*, z, spin
 - **Einstellungsfenster:** 700×540, eine Seite pro Pet.
   - Zeilen: Größe aller Pets, Größe von <Pet>, Klick öffnet, dann Programm-Zeilen (`programRows`), App-Zeilen (`appRows`) oder Website-Zeilen (`linkRows`), Statusanzeige, Buttons.
   - Zwei `TrackBar`s in Pixeln (`SetupSlider`): 162 bis zur Höhe des höchsten Bildschirms, Striche alle 162 px, daneben der Wert („324 px“).
-    - „Größe aller Pets“ schreibt `[app] height`. Hat das gezeigte Pet keine eigene Höhe, läuft sein Regler mit.
+    - „Größe aller Pets“ setzt alle Pets auf diese Höhe (eigene Höhen gehen, eine noch wartende eigene auch). Der zweite Regler läuft mit.
     - „Größe von <Pet>“ schreibt eine eigene `height`. Der Link „wie alle“ löscht sie wieder und ist grau, solange das Pet keine eigene hat.
     - Geschrieben wird 80 ms nach der letzten Bewegung (`sizeTimer`, `WriteHeights`), außerdem vor dem Seitenwechsel und beim Schließen. Die Pets folgen also fast sofort, ohne dass jeder Pixel die Datei neu schreibt.
     - Solange ein Regler gezogen wird oder ein Wert noch aussteht, setzt `ShowPet` die Regler nicht zurück, sonst springt der Griff.
@@ -284,7 +286,7 @@ anim <name> <sprite> <sprite> …           # optional: burst, twinkle*, z, spin
   - **Statusanzeige:** `HookText` sucht in der Config des Agents nach dem Pfad dieser exe, so geschrieben, wie er dort steht (JSON: `\\`; YAML/PowerShell: `''`).
     - Texte: „✓ Hooks eingerichtet“, „Keine Hooks in …“ oder „Hooks rufen eine andere aipets.exe auf“.
     - Bei den letzten beiden erscheint der Link „Hooks einrichten“ (`Setup.Hooks(quelle, App.ExePath, true)`, Ergebnis als Meldung).
-- **Rechtsklick-Menü des Pets:** öffnen, Ordner (im Programm-Modus und bei einer App über `appcommand`), Klick öffnet → Programm/Desktop-App/Website, Größe (Gruppe „Alle Pets“ 162/324/486/648 px, Gruppe „Nur <Pet>“: wie alle, kleiner (× 0,8), größer (× 1,25), so hoch wie der Bildschirm), zurück in die Ecke, ausblenden, Einstellungen, beenden.
+- **Rechtsklick-Menü des Pets:** öffnen, Ordner (im Programm-Modus und bei einer App über `appcommand`), Klick öffnet → Programm/Desktop-App/Website, Größe (Gruppe „Alle Pets“ 162/324/486/648 px, setzt wie der Regler alle Pets, Gruppe „Nur <Pet>“: wie alle, kleiner (× 0,8), größer (× 1,25), so hoch wie der Bildschirm), zurück in die Ecke, ausblenden, Einstellungen, beenden.
   - „Desktop-App“ gibt es nur bei Pets mit `app=`. Der Tooltip zeigt die gefundene App oder was ein Klick ohne sie tut.
 - **Tray ⇄ Pet:**
   - Pets heißen `aipets.pet.<id>` (Fenstertitel), das Tray-Fenster `aipets.host`.

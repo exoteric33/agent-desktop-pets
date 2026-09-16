@@ -191,6 +191,14 @@ namespace AiPets
                 return Math.Max(1, (int)Math.Round(2 * g.DpiX / 96.0)) * HeightUnit;
         }
 
+        /// <summary>The height for all pets. It replaces every pet's own height: they all snap to it.</summary>
+        public static void ShareHeight(Ini ini, int px)
+        {
+            foreach (string section in ini.SectionNames())
+                ini.Set(section, "height", null);
+            ini.Set("app", "height", Number(px));
+        }
+
         /// <summary>"324 px"</summary>
         public static string HeightText(int px)
         {

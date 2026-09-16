@@ -320,10 +320,10 @@ namespace AiPets
             Ipc.PostToPet(p.Info.Id, Ipc.CmdReload);
         }
 
-        /// <summary>The slider for all pets: their height in screen pixels, applied right away (pets with their own keep it).</summary>
+        /// <summary>The slider for all pets: every pet snaps to this height right away, own heights go.</summary>
         public void SetHeight(int px)
         {
-            Store.Update("app", "height", PetSettings.Number(px));
+            Store.Change(delegate(Ini settings) { PetSettings.ShareHeight(settings, px); });
             ReloadIni();
             foreach (PetProcess p in Pets)
                 Ipc.PostToPet(p.Info.Id, Ipc.CmdReload);

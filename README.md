@@ -21,8 +21,8 @@ Pixel-Art-Desktop-Pets für Windows, eins pro KI-Agent. Die Pets sitzen auf der 
    Mehrmals ausführen schadet nicht: Was schon stimmt, bleibt unverändert. Von jeder geänderten Datei liegt die vorige Fassung als `<datei>.bak-aipets` daneben. Agents, die gerade laufen, einmal neu starten, damit sie die Hooks laden.
 2. **Bedienen:** Im Infobereich der Taskleiste (bei den ausgeblendeten Symbolen hinter `^`) erscheint das aipets-Icon.
    - **Linksklick:** Einstellungen. Dort kannst du Pets ein- und ausblenden, mit zwei Reglern die Größe wählen und unter **„Klick öffnet“** zwischen **Programm**, **Desktop-App** und **Website** umschalten. Die Desktop-App gibt es bei Claude, Hermes und Astra.
-     - **„Größe aller Pets“:** die Höhe aller Pets in Pixeln, von 162 px bis zur Bildschirmhöhe. Die Striche stehen bei 162, 324, 486 … px. Sie gilt für jedes Pet ohne eigene Größe, und alle diese Pets sind gleich hoch.
-     - **„Größe von <Pet>“:** eine eigene Höhe nur für dieses Pet, ebenfalls bis zur vollen Bildschirmhöhe. Der obere Regler ändert sie nicht. **„wie alle“** daneben hängt das Pet wieder an den oberen Regler.
+     - **„Größe aller Pets“:** die Höhe aller Pets in Pixeln, von 162 px bis zur Bildschirmhöhe. Die Striche stehen bei 162, 324, 486 … px. Verschiebst du ihn, springen **alle** Pets auf diese Höhe, auch die mit eigener Größe, und sind dann gleich hoch.
+     - **„Größe von <Pet>“:** eine eigene Höhe nur für dieses Pet, ebenfalls bis zur vollen Bildschirmhöhe. Sie bleibt, bis du den oberen Regler wieder bewegst. **„wie alle“** daneben setzt das Pet schon vorher auf die Höhe aller zurück.
      - Es wird nichts mehr malgenommen. Kleiner als 162 px geht nicht, größer als der Bildschirm auch nicht. Steht ein Pet auf einem niedrigeren Bildschirm, wird es dort passend kleiner.
      - Die Pets folgen beim Ziehen sofort. Die Pixel-Art wird nur gestreckt, nicht verändert.
      - Programm: Programm, Argumente, Terminal und Arbeitsordner.
@@ -41,7 +41,7 @@ Pixel-Art-Desktop-Pets für Windows, eins pro KI-Agent. Die Pets sitzen auf der 
 
 **Hintergrund:** Das Tray-Programm startet jedes Pet als eigenen Prozess (`aipets.exe --pet <id>`). Stürzt ein Pet ab oder wird es beendet, startet das Tray-Programm es neu. Beendest du das Tray-Programm, verschwinden auch die Pets.
 
-**Pet-Rechtsklick:** öffnen, Arbeitsordner (nur im Programm-Modus), „Klick öffnet“ → Programm / Desktop-App / Website, Größe (alle Pets: 162 bis 648 px; nur dieses Pet: wie alle, kleiner, größer, so hoch wie der Bildschirm), zurück in die Ecke, ausblenden, Einstellungen, aipets beenden. Ein ausgeblendetes Pet bleibt aus, auch nach einem Neustart, bis du es in den Einstellungen oder im Tray-Menü wieder einschaltest.
+**Pet-Rechtsklick:** öffnen, Arbeitsordner (nur im Programm-Modus), „Klick öffnet“ → Programm / Desktop-App / Website, Größe (alle Pets auf 162 bis 648 px; nur dieses Pet: wie alle, kleiner, größer, so hoch wie der Bildschirm), zurück in die Ecke, ausblenden, Einstellungen, aipets beenden. Ein ausgeblendetes Pet bleibt aus, auch nach einem Neustart, bis du es in den Einstellungen oder im Tray-Menü wieder einschaltest.
 
 Ein Klick startet Claude Code mit `--dangerously-skip-permissions`, Hermes mit `--yolo` und Codex mit `--dangerously-bypass-approvals-and-sandbox`. Gemini öffnet `https://gemini.google.com/app`, Grok `https://grok.com/`, beide im Standardbrowser. Das alles kannst du in den Einstellungen oder in `pets\<id>\pet.ini` ändern. Gemini CLI und Grok CLI sind nicht dabei; wer den Programm-Modus will, muss sie selbst installieren.
 

@@ -28,7 +28,7 @@ Pixel-Art-Desktop-Pets für Windows, eins pro KI-Agent. Ein Tray-Programm (`aipe
 | `gemini` | Gemini | ins Chat eingefügtes Bild (nur im Repo) | Website gemini.google.com/app | `gemini` (CLI nicht installiert) | – | Google-„G“ statt „3.8 Flash“, gezeichnete Augen, winkt |
 | `grok` | Grok | `Desktop\grok-chan-pixel-ohne-tablet.png` | Website grok.com | `grok` (CLI nicht installiert) | – | xAI-Logo statt „grok“ (User-Wahl), zwinkert beim Hover wie im Bild, Peace-Zeichen wippt |
 
-Commits auf `main`: ClaudePet → aipets (Tray, Hermes) → Astra/Codex-Hooks → Gemini/Link-Pets → Grok und Programm/Website-Auswahl für alle → neues Grok-Aussehen → Ein-Klick-Installation → Desktop-App-Modus und gleich große Pets → Größen-Regler (alle und einzeln) und Autostart als Standard → Größe als Pixelhöhe bis zur Bildschirmgrenze, Ausblenden sicher gespeichert.
+Commits auf `main`: ClaudePet → aipets (Tray, Hermes) → Astra/Codex-Hooks → Gemini/Link-Pets → Grok und Programm/Website-Auswahl für alle → neues Grok-Aussehen → Ein-Klick-Installation → Desktop-App-Modus und gleich große Pets → Größen-Regler (alle und einzeln) und Autostart als Standard → Größe als Pixelhöhe bis zur Bildschirmgrenze, Ausblenden sicher gespeichert → „Größe aller Pets“ setzt alle Pets.
 
 Grok hatte zuerst eine andere Vorlage (`Desktop\grok-chan.png`: Brille, Tablet, Uhr). Der User hat danach nur das Aussehen durch `grok-chan-pixel-ohne-tablet.png` ersetzen lassen; alles andere (Link, Logo-Wahl, Effekte) blieb.
 
@@ -45,6 +45,8 @@ Grok hatte zuerst eine andere Vorlage (`Desktop\grok-chan.png`: Brille, Tablet, 
 **Größe als Pixelhöhe, Ausblenden bleibt, Autostart als Standard** (Wünsche des Users):
 - **Größe:** Einstellungen → zwei Regler in Pixeln, beide gelten fast sofort (80 ms nach der letzten Bewegung).
   - „Größe aller Pets“ (`[app] height`) und „Größe von <Pet>“ (eigene `[id] height`, „wie alle“ löscht sie). Grenzen: 162 px bis Bildschirmhöhe.
+  - Der obere Regler setzt **alle** Pets auf seine Höhe und löscht dabei die eigenen (Wunsch des Users: ein Pet soll z. B. von 100 auf 300 mitspringen). Eine eigene Höhe hält also nur bis zur nächsten Bewegung des oberen Reglers.
+  - Am 2026-09-16 hat ein Agent auf Wunsch alle Größen zurückgesetzt (kein `[app] height`, keine eigenen), also 324 px für alle. Positionen und Ausblenden blieben.
   - Das Pet-Menü bietet 162–648 px für alle und kleiner/größer/bildschirmhoch für ein Pet.
 - **Vorher** gab es kurz gemeinsame Größe × Prozent pro Pet. Der User fand, dass sich das zu riesigen oder mikroskopisch kleinen Pets multipliziert, und wollte ein neues, besseres System, in dem ein Pet bis zur Bildschirmgrenze wachsen kann.
 - **Übernahme:** Das Tray rechnet alte `scale`/`size`/`percent` einmal in Höhen um (mindestens 162 px).
@@ -55,7 +57,7 @@ Grok hatte zuerst eine andere Vorlage (`Desktop\grok-chan.png`: Brille, Tablet, 
   - Das Tray startet keine Pets mit Standardwerten, wenn `settings.ini` gerade nicht lesbar ist (`Store.TryLoad`, 5 Leseversuche).
 - **Autostart:** „Mit Windows starten“ ist standardmäßig an. Das Tray schaltet es beim Start ein, außer der User hat es ausgeschaltet (`[app] autostart=0`). Test-exes und `--dry-run` fassen es nie an.
 - **Getestet:**
-  - 30 Prüfungen: Höhen lesen, Grenzen, welche Höhe gilt, Bildschirmgrenze (`FitScreen`), alte Werte umrechnen, `TryLoad` lesend.
+  - 35 Prüfungen: Höhen lesen, Grenzen, welche Höhe gilt, `ShareHeight` (setzt alle, lässt den Rest), Bildschirmgrenze (`FitScreen`), alte Werte umrechnen, `TryLoad` lesend.
     - Dazu, dass der Autostart-Standard die Registry für eine Test-exe nicht anfasst.
   - Die 70 Desktop-App-Prüfungen erneut. Einstellungsseite und `lineup.png` als PNG. Umrechnung beim echten Neustart nachgeprüft.
 - **Nicht getestet:** die Regler von Hand ziehen, das Pet-Menü, ein zweiter Bildschirm.

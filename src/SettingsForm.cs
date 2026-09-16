@@ -169,20 +169,25 @@ namespace AiPets
             page.Controls.AddRange(new Control[] { avatar, title, state, showBox });
 
             // two height sliders, both live: the pets follow while a slider moves.
-            // All pets: those without their own height. This pet: her own height, "wie alle" gives it back.
+            // All pets: every pet snaps to it, own heights go. This pet: her own height until the next
+            // move of the first slider; "wie alle" gives it back earlier.
             int y = 128;
             AddLabel(page, "Größe aller Pets", y);
             SetupSlider(page, sizeBar, sizeValue, y);
             sizeBar.ValueChanged += delegate
             {
+                if (!loading && host != null)
+                {
+                    ownHeight = false;
+                    pendingOwn = 0;   // an own height that is still waiting would be undone anyway
+                    pendingOwnPet = null;
+                    pendingShared = sizeBar.Value;
+                    sizeTimer.Stop();
+                    sizeTimer.Start();
+                }
                 if (!ownHeight)
                     Quietly(delegate { petSizeBar.Value = sizeBar.Value; });   // she follows all pets
                 ShowSizes();
-                if (loading || host == null)
-                    return;
-                pendingShared = sizeBar.Value;
-                sizeTimer.Stop();
-                sizeTimer.Start();
             };
 
             y += 36;

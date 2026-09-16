@@ -982,10 +982,10 @@ namespace AiPets
             menu.Show(Cursor.Position);
         }
 
-        /// <summary>The height of all pets from the menu, like the first slider in the settings.</summary>
+        /// <summary>The height of all pets from the menu, like the first slider in the settings: every pet snaps to it.</summary>
         void SetSharedHeight(int px)
         {
-            Store.Update("app", "height", PetSettings.Number(px));
+            Store.Change(delegate(Ini ini) { PetSettings.ShareHeight(ini, px); });
             TakeOwnChange();
             foreach (PetInfo other in PetInfo.Discover())
                 if (other.Id != pet.Id)

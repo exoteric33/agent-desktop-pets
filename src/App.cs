@@ -61,6 +61,11 @@ namespace AiPets
             return s != null && int.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out n) ? n : fallback;
         }
 
+        public List<string> SectionNames()
+        {
+            return new List<string>(sections.Keys);
+        }
+
         /// <summary>Sets a value; null removes the key.</summary>
         public void Set(string section, string key, string value)
         {
@@ -127,11 +132,20 @@ namespace AiPets
         /// <summary>Changes keys of one section: Update("hermes", "x", "10", "y", null) — null removes.</summary>
         public static void Update(string section, params string[] keyValues)
         {
+            Change(delegate(Ini ini)
+            {
+                for (int i = 0; i + 1 < keyValues.Length; i += 2)
+                    ini.Set(section, keyValues[i], keyValues[i + 1]);
+            });
+        }
+
+        /// <summary>Reads the file, lets change edit it and writes it back, all in one go under the mutex.</summary>
+        public static void Change(Action<Ini> change)
+        {
             Locked(delegate
             {
                 Ini ini = Read() ?? new Ini();
-                for (int i = 0; i + 1 < keyValues.Length; i += 2)
-                    ini.Set(section, keyValues[i], keyValues[i + 1]);
+                change(ini);
                 Directory.CreateDirectory(App.DataDir);
                 File.WriteAllText(FilePath, ini.Format());
             });
