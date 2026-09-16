@@ -127,3 +127,7 @@ Codex führt neue Hooks erst aus, wenn du sie freigegeben hast: In Codex `/hooks
 - Bei abgebrochenen Codex-Turns ohne Abschluss-Hook kann der Spinner bis zum Timeout von 15 Minuten bleiben.
 - Die Status-Hooks der Claude-Desktop-App und Hermes Desktop sowie das Verhalten auf mehreren Monitoren müssen noch manuell geprüft werden.
 - Der YAML-Editor unterstützt eingerückte Hook-Listen, leere Blöcke und Kommentare. Kompakte nichtleere Inline-Hook-Listen oder doppelte Hook-Schlüssel werden mit einer Fehlermeldung abgelehnt; die Datei bleibt erhalten.
+
+## Lizenz
+
+Der Quellcode steht unter der [MIT-Lizenz](LICENSE). Die Pet-Grafiken in `pets/*/sprites/` sowie Namen und Logos von Anthropic, OpenAI, Google, xAI und Nous Research fallen nicht darunter. aipets ist ein inoffizielles Fan-Projekt und steht in keiner Verbindung zu diesen Anbietern.
