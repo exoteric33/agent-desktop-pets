@@ -19,9 +19,6 @@ namespace AiPets
     {
         // room around the character cell for the speech bubble and particles (cell pixels)
         const int PadX = 26, PadTop = 20;
-        // screen pixels a pet is tall per size step (1×, 2× …), whatever her sprite height: the tallest
-        // figure (Grok) at 1:1, so all pets stand equally tall at the same size and none is drawn below her own pixels
-        const int SizeUnit = 162;
         const int IdleStepMs = 260, SleepStepMs = 620;
         const int SleepAfterMs = 60 * 1000;
         const int BubbleDelayMs = 120;
@@ -58,8 +55,8 @@ namespace AiPets
         DateTime settingsStamp;
         Native.LayeredSurface surface;
         Graphics gfx;
-        double size;                // the size all pets share, 1 … 4
-        double zoom;                // screen pixels per sprite pixel at that size (rarely a whole number)
+        int height;                 // how tall the figure is on screen, whatever her sprite height
+        double zoom;                // screen pixels per sprite pixel at that height (rarely a whole number)
         Point anchor;               // bottom-centre of the pet on screen
         bool mirrored;
         string lastRender;
@@ -108,11 +105,12 @@ namespace AiPets
             Text = Ipc.PetTitle(pet.Id);
             Cursor = Cursors.Hand;
 
-            SetSize(settings.PetSize());
-            anchor = settings.HasPosition ? Clamp(new Point(settings.X, settings.Y), true) : HomeAnchor();
+            var saved = new Point(settings.X, settings.Y);
+            SetHeight(FitScreen(settings.HasPosition ? saved : Screen.PrimaryScreen.WorkingArea.Location, settings.PetHeight()));
+            anchor = settings.HasPosition ? Clamp(saved, true) : HomeAnchor();
             mirrored = WantsMirror(anchor, false);
             menu = BuildMenu();
-            Log.Write("start at " + anchor.X + "," + anchor.Y + " (home " + HomeAnchor().X + ", size " + PetSettings.Number(size)
+            Log.Write("start at " + anchor.X + "," + anchor.Y + " (home " + HomeAnchor().X + ", height " + height
                 + ", zoom " + Math.Round(zoom, 3).ToString(CultureInfo.InvariantCulture)
                 + ", work area " + Screen.PrimaryScreen.WorkingArea + ")");
 
@@ -160,7 +158,7 @@ namespace AiPets
         protected override void OnHandleCreated(EventArgs e)
         {
             base.OnHandleCreated(e);
-            ApplySize(size);
+            ApplyHeight(height);
             timer.Start();
         }
 
@@ -199,13 +197,13 @@ namespace AiPets
 
         /// <summary>
         /// "Back to the corner": pet.ini home is the gap from the screen's right edge to the cell's, in pixels
-        /// at 1×. It grows with the shared size only, so the places stay put when one pet gets bigger.
+        /// at 162 px height. It grows with the height of all pets only, so the places stay put when one pet has her own.
         /// </summary>
         Point HomeAnchor()
         {
             Rectangle wa = Screen.PrimaryScreen.WorkingArea;
-            double shared = settings.Size > 0 ? settings.Size : PetSettings.DefaultSize();
-            return new Point(wa.Right - Px(atlas.CellW) / 2 - (int)Math.Round(pet.Home * shared), wa.Bottom);
+            int gap = (int)Math.Round((double)pet.Home * settings.SharedHeight() / PetSettings.HeightUnit);
+            return new Point(wa.Right - Px(atlas.CellW) / 2 - gap, wa.Bottom);
         }
 
         Point Clamp(Point p, bool snapToTaskbar)
@@ -233,16 +231,27 @@ namespace AiPets
             return lookLeft != atlas.FacingLeft;
         }
 
-        /// <summary>Size and zoom: at size n every pet is n × SizeUnit screen pixels tall.</summary>
-        void SetSize(double newSize)
+        /// <summary>Height and zoom: the figure is px screen pixels tall, whatever her sprite height.</summary>
+        void SetHeight(int px)
         {
-            size = newSize;
-            zoom = newSize * SizeUnit / atlas.FigureHeight;
+            height = px;
+            zoom = (double)px / atlas.FigureHeight;
         }
 
-        void ApplySize(double newSize)
+        /// <summary>A height that fits the work area of the screen at p: a pet can grow up to the full screen height.</summary>
+        public static int FitScreen(Point p, int px)
         {
-            SetSize(newSize);
+            return Math.Max(1, Math.Min(px, Screen.FromPoint(p).WorkingArea.Height));
+        }
+
+        int ScreenHeight()
+        {
+            return Screen.FromPoint(anchor).WorkingArea.Height;
+        }
+
+        void ApplyHeight(int px)
+        {
+            SetHeight(px);
             anchor = Clamp(anchor, false);
             if (gfx != null) gfx.Dispose();
             if (surface != null) surface.Dispose();
@@ -266,8 +275,17 @@ namespace AiPets
         {
             BeginInvoke((MethodInvoker)delegate
             {
+                FitHeight();   // the screen may be lower now
                 MoveTo(settings.HasPosition ? anchor : HomeAnchor(), true);
             });
+        }
+
+        /// <summary>After a move or a display change: the height she asks for, as far as her screen allows.</summary>
+        void FitHeight()
+        {
+            int fitted = FitScreen(anchor, settings.PetHeight());
+            if (fitted != height)
+                ApplyHeight(fitted);
         }
 
         /// <summary>settings.ini changed (tray settings window, "back to the corner", another size).</summary>
@@ -275,11 +293,11 @@ namespace AiPets
         {
             settingsStamp = Store.Stamp();
             PetSettings s = PetSettings.From(pet, Store.Load());
-            double newSize = s.PetSize();
+            int newHeight = FitScreen(anchor, s.PetHeight());
             settings = s;
-            if (Math.Abs(newSize - size) > 0.001)
+            if (newHeight != height)
             {
-                ApplySize(newSize);
+                ApplyHeight(newHeight);
                 if (!s.HasPosition)
                     MoveTo(HomeAnchor(), true);
                 SavePosition();
@@ -647,8 +665,8 @@ namespace AiPets
         }
 
         /// <summary>
-        /// Size check: every pet idle at size 2, side by side on one baseline. All heads should touch
-        /// the line 2 × SizeUnit above the ground line.
+        /// Size check: every pet idle at 324 px (without her own height), side by side on one baseline.
+        /// All heads should touch the line 324 px above the ground line.
         /// </summary>
         public static void SnapshotLineup(List<PetInfo> infos, string path)
         {
@@ -662,7 +680,7 @@ namespace AiPets
                         continue;
                     var pet = new PetForm(info, null);
                     pets.Add(pet);
-                    pet.SetSize(2);
+                    pet.SetHeight(2 * PetSettings.HeightUnit);
                     pet.mirrored = false;
                     width += pet.CanvasPxW;
                     height = Math.Max(height, pet.CanvasPxH);
@@ -685,7 +703,8 @@ namespace AiPets
                     using (var pen = new Pen(Color.FromArgb(255, 110, 110)))
                     {
                         g.DrawLine(pen, 0, height, width, height);
-                        g.DrawLine(pen, 0, height - 2 * SizeUnit - 1, width, height - 2 * SizeUnit - 1);
+                        int top = height - 2 * PetSettings.HeightUnit - 1;
+                        g.DrawLine(pen, 0, top, width, top);
                     }
                     bmp.Save(path);
                 }
@@ -829,6 +848,10 @@ namespace AiPets
         {
             dragging = false;
             MoveTo(anchor, true);
+            int before = height;
+            FitHeight();   // on another screen she may have to be smaller, or may grow back
+            if (height != before)
+                MoveTo(anchor, true);
             SavePosition();
         }
 
@@ -863,7 +886,7 @@ namespace AiPets
             });
         }
 
-        /// <summary>Only the position: the size belongs to all pets and is written where it changes.</summary>
+        /// <summary>Only the position: heights are written where they change.</summary>
         void SavePosition()
         {
             Store.Update(pet.Id, "x", PetSettings.Number(anchor.X), "y", PetSettings.Number(anchor.Y));
@@ -886,21 +909,23 @@ namespace AiPets
             var openApp = new ToolStripMenuItem("Desktop-App", null, delegate { SetMode("app"); });
             var openWebsite = new ToolStripMenuItem("Website", null, delegate { SetMode("website"); });
             opens.DropDownItems.AddRange(new ToolStripItem[] { openProgram, openApp, openWebsite });
-            // shared sizes (Tag double) and this pet's own share (Tag int), each under a grey heading
+            // heights of all pets (Tag = px), then this pet's own, each group under a grey heading
             var sizes = new ToolStripMenuItem("Größe");
-            sizes.DropDownItems.Add(new ToolStripMenuItem("Alle Pets") { Enabled = false });
+            var shared = new List<ToolStripMenuItem>();
             for (int i = 1; i <= 4; i++)
             {
-                double s = i;
-                sizes.DropDownItems.Add(new ToolStripMenuItem(PetSettings.SizeText(s), null, delegate { ShareSize(s); }) { Tag = s });
+                int px = i * PetSettings.HeightUnit;
+                shared.Add(new ToolStripMenuItem(PetSettings.HeightText(px), null, delegate { SetSharedHeight(px); }) { Tag = px });
             }
+            var likeAll = new ToolStripMenuItem("Wie alle", null, delegate { SetOwnHeight(0); });
+            var smaller = new ToolStripMenuItem("Kleiner", null, delegate { SetOwnHeight(height * 4 / 5); });
+            var bigger = new ToolStripMenuItem("Größer", null, delegate { SetOwnHeight(height * 5 / 4); });
+            var screenHigh = new ToolStripMenuItem("So hoch wie der Bildschirm", null, delegate { SetOwnHeight(ScreenHeight()); });
+            sizes.DropDownItems.Add(new ToolStripMenuItem("Alle Pets") { Enabled = false });
+            sizes.DropDownItems.AddRange(shared.ToArray());
             sizes.DropDownItems.Add(new ToolStripSeparator());
             sizes.DropDownItems.Add(new ToolStripMenuItem("Nur " + pet.Name) { Enabled = false });
-            foreach (int preset in new[] { 75, 100, 125, 150 })
-            {
-                int percent = preset;
-                sizes.DropDownItems.Add(new ToolStripMenuItem(PetSettings.PercentText(percent), null, delegate { OwnSize(percent); }) { Tag = percent });
-            }
+            sizes.DropDownItems.AddRange(new ToolStripItem[] { likeAll, smaller, bigger, screenHigh });
             var home = new ToolStripMenuItem("Zurück in die Ecke", null, delegate
             {
                 MoveTo(HomeAnchor(), true);
@@ -908,6 +933,9 @@ namespace AiPets
             });
             var hide = new ToolStripMenuItem("Ausblenden", null, delegate
             {
+                // saved here as well: she stays hidden after a restart even if the tray does not answer now
+                Store.Update(pet.Id, "enabled", "0");
+                settingsStamp = Store.Stamp();
                 if (!Ipc.SendToHost("hide " + pet.Id))
                     Close();
             });
@@ -936,15 +964,12 @@ namespace AiPets
                 openApp.Visible = s.DesktopApp.Length > 0;   // only pets that know a desktop app
                 openApp.ToolTipText = AppText(s);
                 openWebsite.ToolTipText = s.Url;
-                double shared = s.Size > 0 ? s.Size : PetSettings.DefaultSize();
-                foreach (ToolStripItem item in sizes.DropDownItems)
-                {
-                    var entry = item as ToolStripMenuItem;
-                    if (entry != null && entry.Tag is double)
-                        entry.Checked = Math.Abs((double)entry.Tag - shared) < 0.001;
-                    else if (entry != null && entry.Tag is int)
-                        entry.Checked = (int)entry.Tag == s.Percent;
-                }
+                foreach (ToolStripMenuItem entry in shared)
+                    entry.Checked = (int)entry.Tag == s.SharedHeight();
+                likeAll.Checked = s.OwnHeight == 0;
+                smaller.Enabled = height > PetSettings.MinHeight;
+                bigger.Enabled = height < ScreenHeight();
+                screenHigh.Checked = s.OwnHeight > 0 && height == ScreenHeight();
                 prefs.Visible = host != null;
             };
             strip.Closed += delegate { menuOpen = false; };
@@ -957,29 +982,30 @@ namespace AiPets
             menu.Show(Cursor.Position);
         }
 
-        /// <summary>A shared size from the menu, for all pets like the first slider in the settings.</summary>
-        void ShareSize(double shared)
+        /// <summary>The height of all pets from the menu, like the first slider in the settings.</summary>
+        void SetSharedHeight(int px)
         {
-            Store.Update("app", "size", PetSettings.Number(shared));
+            Store.Update("app", "height", PetSettings.Number(px));
             TakeOwnChange();
             foreach (PetInfo other in PetInfo.Discover())
                 if (other.Id != pet.Id)
                     Ipc.PostToPet(other.Id, Ipc.CmdReload);
         }
 
-        /// <summary>This pet's own share of the size, like the second slider.</summary>
-        void OwnSize(int percent)
+        /// <summary>This pet's own height (0: the one of all pets again), like the second slider.</summary>
+        void SetOwnHeight(int px)
         {
-            Store.Update(pet.Id, "percent", percent == 100 ? null : PetSettings.Number(percent));
+            px = px <= 0 ? 0 : Math.Max(PetSettings.MinHeight, Math.Min(ScreenHeight(), px));
+            Store.Update(pet.Id, "height", px == 0 ? null : PetSettings.Number(px));
             TakeOwnChange();
         }
 
-        /// <summary>A size this pet wrote itself: apply it now instead of waiting for the file stamp.</summary>
+        /// <summary>A height this pet wrote itself: apply it now instead of waiting for the file stamp.</summary>
         void TakeOwnChange()
         {
             settingsStamp = Store.Stamp();
             settings = PetSettings.From(pet, Store.Load());
-            ApplySize(settings.PetSize());
+            FitHeight();
             SavePosition();
         }
 

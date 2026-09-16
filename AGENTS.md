@@ -28,7 +28,7 @@ Pixel-Art-Desktop-Pets für Windows, eins pro KI-Agent. Ein Tray-Programm (`aipe
 | `gemini` | Gemini | ins Chat eingefügtes Bild (nur im Repo) | Website gemini.google.com/app | `gemini` (CLI nicht installiert) | – | Google-„G“ statt „3.8 Flash“, gezeichnete Augen, winkt |
 | `grok` | Grok | `Desktop\grok-chan-pixel-ohne-tablet.png` | Website grok.com | `grok` (CLI nicht installiert) | – | xAI-Logo statt „grok“ (User-Wahl), zwinkert beim Hover wie im Bild, Peace-Zeichen wippt |
 
-Commits auf `main`: ClaudePet → aipets (Tray, Hermes) → Astra/Codex-Hooks → Gemini/Link-Pets → Grok und Programm/Website-Auswahl für alle → neues Grok-Aussehen → Ein-Klick-Installation → Desktop-App-Modus und gleich große Pets → Größen-Regler (alle und einzeln) und Autostart als Standard.
+Commits auf `main`: ClaudePet → aipets (Tray, Hermes) → Astra/Codex-Hooks → Gemini/Link-Pets → Grok und Programm/Website-Auswahl für alle → neues Grok-Aussehen → Ein-Klick-Installation → Desktop-App-Modus und gleich große Pets → Größen-Regler (alle und einzeln) und Autostart als Standard → Größe als Pixelhöhe bis zur Bildschirmgrenze, Ausblenden sicher gespeichert.
 
 Grok hatte zuerst eine andere Vorlage (`Desktop\grok-chan.png`: Brille, Tablet, Uhr). Der User hat danach nur das Aussehen durch `grok-chan-pixel-ohne-tablet.png` ersetzen lassen; alles andere (Link, Logo-Wahl, Effekte) blieb.
 
@@ -42,21 +42,26 @@ Grok hatte zuerst eine andere Vorlage (`Desktop\grok-chan.png`: Brille, Tablet, 
   - Auf dem Rechner des Users war `--install` ein No-op (Hashes gleich), weil schon alles eingerichtet war.
 - **Nicht getestet:** Doppelklick mit Fenstern und `--uninstall` auf dem echten Rechner (würde seine Hooks entfernen).
 
-**Größen-Regler und Autostart als Standard** (Wunsch des Users):
-- **Größe:** Einstellungen → zwei Regler, beide gelten sofort.
-  - „Größe aller Pets“: 1× bis 4× in Viertelschritten, gespeichert in `[app] size`.
-  - „Größe von <Pet>“: 50–200 % davon für dieses Pet, gespeichert als `[id] percent`. Der User wollte die Pets auch einzeln größer oder kleiner machen.
-  - Die Pet-Größe ist `size × percent`, begrenzt auf 0,5–6. Das Pet-Menü bietet beides als Stufen an.
-  - Beim ersten Start hat das Tray die alten Werte `scale` übernommen, beim User 2× für alle (also kein `percent`).
+**Größe als Pixelhöhe, Ausblenden bleibt, Autostart als Standard** (Wünsche des Users):
+- **Größe:** Einstellungen → zwei Regler in Pixeln, beide gelten fast sofort (80 ms nach der letzten Bewegung).
+  - „Größe aller Pets“ (`[app] height`) und „Größe von <Pet>“ (eigene `[id] height`, „wie alle“ löscht sie). Grenzen: 162 px bis Bildschirmhöhe.
+  - Das Pet-Menü bietet 162–648 px für alle und kleiner/größer/bildschirmhoch für ein Pet.
+- **Vorher** gab es kurz gemeinsame Größe × Prozent pro Pet. Der User fand, dass sich das zu riesigen oder mikroskopisch kleinen Pets multipliziert, und wollte ein neues, besseres System, in dem ein Pet bis zur Bildschirmgrenze wachsen kann.
+- **Übernahme:** Das Tray rechnet alte `scale`/`size`/`percent` einmal in Höhen um (mindestens 162 px).
+  - Beim User stand zuletzt `size=1`, Claude/Hermes/Astra/Gemini 200 %, Grok 50 %.
+  - Daraus wurden 162 px für alle, 324 px eigene Höhe für die vier, und Grok fiel mit 81 → 162 px auf „wie alle“ zurück.
+- **Ausblenden:** Das Tray speicherte `enabled=0` schon immer (beim User waren Hermes, Astra und Gemini ausgeblendet und blieben es). Zwei Lücken sind jetzt zu:
+  - „Ausblenden“ im Pet-Menü schreibt `enabled=0` auch selbst, falls das Tray nicht antwortet.
+  - Das Tray startet keine Pets mit Standardwerten, wenn `settings.ini` gerade nicht lesbar ist (`Store.TryLoad`, 5 Leseversuche).
 - **Autostart:** „Mit Windows starten“ ist standardmäßig an. Das Tray schaltet es beim Start ein, außer der User hat es ausgeschaltet (`[app] autostart=0`). Test-exes und `--dry-run` fassen es nie an.
 - **Getestet:**
-  - 39 Prüfungen: Größe und Anteil lesen, Grenzen, Pet-Größe, alte Werte übernehmen (auch als Anteil), Anzeige.
-    - Dazu, dass der Autostart-Standard die Registry für eine Test-exe nicht anfasst (Run-Wert vorher und nachher gleich).
-  - Die 70 Desktop-App-Prüfungen erneut. Einstellungsseite als PNG.
-- **Nicht getestet:** die Regler von Hand ziehen, das Pet-Menü.
+  - 30 Prüfungen: Höhen lesen, Grenzen, welche Höhe gilt, Bildschirmgrenze (`FitScreen`), alte Werte umrechnen, `TryLoad` lesend.
+    - Dazu, dass der Autostart-Standard die Registry für eine Test-exe nicht anfasst.
+  - Die 70 Desktop-App-Prüfungen erneut. Einstellungsseite und `lineup.png` als PNG. Umrechnung beim echten Neustart nachgeprüft.
+- **Nicht getestet:** die Regler von Hand ziehen, das Pet-Menü, ein zweiter Bildschirm.
 
 **Alle Pets gleich groß** (Wunsch des Users: nach Pixelhöhe gleich skalieren, an den Bildern sonst nichts ändern):
-- Größe n heißt jetzt: Die Figur ist n × 162 px hoch (`SizeUnit` in `PetForm`, die höchste Figur Grok). Jedes Pet bekommt dafür einen eigenen Zoom aus seiner Figurenhöhe (`Atlas.FigureHeight`, gemessen in `normal_0`). Details in PET-BAUANLEITUNG, Abschnitt 6, „Größe“.
+- Jede Figur wird auf eine Höhe in Pixeln gebracht (heute `PetSettings.HeightUnit` = 162 px je alter Stufe, siehe oben). Jedes Pet bekommt dafür einen eigenen Zoom aus seiner Figurenhöhe (`Atlas.FigureHeight`, gemessen in `normal_0`). Details in PET-BAUANLEITUNG, Abschnitt 6, „Größe“.
 - Sprites und Atlas sind unverändert. Die Art-Snapshots (ganze 3×-Pixel) sind byte-gleich zu vorher, bis auf die Bilder mit zufälligen Funken.
 - `home` gilt jetzt in Pixeln bei 1× und wurde neu berechnet (Claude 12, Hermes 115, Astra 211, Gemini 334, Grok 482), damit sich die Pets bei „Zurück in die Ecke“ nicht überlappen.
 - Der User hatte während der Arbeit selbst alle Pets auf 4× gestellt und nach links geschoben. Das bleibt so: Bei 4× sind jetzt alle 648 px hoch (an den laufenden Fenstern nachgemessen, ±1 px).
@@ -123,7 +128,7 @@ aipets.exe --uninstall --quiet                   # NIE auf dem Rechner des Users
   - Nie seine Maus bewegen, keine Test-Terminals oder Browserfenster öffnen.
   - Testen per `--snapshot`, `--command`, `--status`, `--dry-run` und Test-exe. Screenshots nur lesend (BitBlt).
   - `build.ps1` startet aipets neu; das ist üblich und in Ordnung.
-- **Positionen und Größe gehören dem User:** `x`, `y`, `percent` und `[app] size` in `%APPDATA%\aipets\settings.ini` nicht zurücksetzen. Er zieht die Pets oft selbst herum und stellt die Größe um (am 2026-09-16 erst 4×, dann 2×).
+- **Positionen, Größe und Sichtbarkeit gehören dem User:** `x`, `y`, `height`, `enabled` und `[app] height` in `%APPDATA%\aipets\settings.ini` nicht zurücksetzen. Er zieht die Pets oft selbst herum und stellt die Größe um (am 2026-09-16 mehrmals).
   - Für ein neues Pet einen freien Startplatz ausrechnen (sichtbare Pixel aus dem Atlas × Zoom, Zoom = Größe × 162 / Figurenhöhe) und nur dann einen Abschnitt schreiben, wenn der Home-Platz belegt ist. Immer unter dem Mutex `Local\aipets.settings`.
   - Soll die Größe doch einmal geändert werden (nur auf ausdrücklichen Wunsch), vorher die aktuelle `settings.ini` lesen. Der User stellt Größe und Position oft selbst um, während ein Agent arbeitet.
   - Danach jedem Pet `Ipc.PostToPet(id, Ipc.CmdReload)` schicken, sonst kann ein Ziehen die Änderung überschreiben (PET-BAUANLEITUNG, Abschnitt 9).
@@ -165,7 +170,7 @@ aipets.exe --uninstall --quiet                   # NIE auf dem Rechner des Users
 - Gemini und Grok haben keine Statusanzeige; Websites liefern keine Hooks. Mit einer installierten CLI im Programm-Modus könnte man eine Quelle ergänzen (neue `case` in `HookCommand.Run`, `status=` in der pet.ini).
 - Codex meldet `Stop` nicht bei abgebrochenen Turns: Der Spinner hält dann bis zu 15 min (siehe PET-BAUANLEITUNG, Abschnitt 7).
 - `src/Settings.cs` ist ungenutzte Altlast aus ClaudePet (Namespace `ClaudePet`) und könnte gelöscht werden.
-- Home-Positionen gelten in Pixeln bei 1×. Ab etwa 3,5× reicht ein 1920 px breiter Bildschirm nicht mehr für alle fünf, dann überlappen die „Zurück in die Ecke“-Plätze. Eine Idee dafür: „Alle aufreihen“ mit Umbruch oder kleinerem Abstand.
+- Home-Positionen gelten in Pixeln bei 162 px Höhe. Ab etwa 515 px Höhe für alle reicht ein 1920 px breiter Bildschirm nicht mehr für alle fünf, dann überlappen die „Zurück in die Ecke“-Plätze. Pets mit eigener Höhe können ihre Nachbarn überdecken. Eine Idee dafür: „Alle aufreihen“ mit Umbruch oder kleinerem Abstand.
 - Weitere Ideen, die der User gut fand, aber noch nicht bestellt hat:
   - Klick auf ein wartendes Pet holt die Sitzung nach vorn.
   - Sitzungsliste im Pet-Menü.

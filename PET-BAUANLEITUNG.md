@@ -78,9 +78,11 @@ aipets\
 ```
 
 Laufzeitdaten liegen in `%APPDATA%\aipets\`:
-- `settings.ini`: `[app]` (`size` für alle Pets, `autostart=0` nach einem „aus“) und ein Abschnitt pro Pet (`x`, `y`, `percent`, `enabled`, `workdir`, `mode`, `program`, `args`, `shell`, `app`, `url`), geschrieben von Tray und Pets, immer unter dem Mutex `Local\aipets.settings`
-  - Ältere Dateien haben `scale` pro Pet. Das Tray übernimmt beim Start den häufigsten Wert (bei Gleichstand den größeren) als `[app] size` und löscht die alten Schlüssel (`TrayHost.MoveSizesToApp`).
-  - Ein Pet mit anderer alter Größe bekommt sie als `percent` (5-%-Schritte, 50–200).
+- `settings.ini`: `[app]` (`height` für alle Pets, `autostart=0` nach einem „aus“) und ein Abschnitt pro Pet (`x`, `y`, `height`, `enabled`, `workdir`, `mode`, `program`, `args`, `shell`, `app`, `url`), geschrieben von Tray und Pets, immer unter dem Mutex `Local\aipets.settings`
+  - **Alte Größen:** Frühere Versionen zählten Größen in Stufen von 162 px: `scale` pro Pet, danach `[app] size` mit `percent` pro Pet.
+    - Das Tray rechnet das beim Start einmal in Höhen um (`TrayHost.MoveSizesToHeights`, nie unter 162 px) und löscht die alten Schlüssel.
+    - Für alle zählt `[app] size`, sonst der häufigste alte `scale`-Wert. Ein Pet mit abweichender Größe bekommt eine eigene `height`.
+  - **`enabled=0`:** Das Pet ist ausgeblendet und bleibt es auch nach einem Neustart. Das Tray schreibt den Wert, und „Ausblenden“ im Pet-Menü schreibt ihn zusätzlich selbst, falls das Tray gerade nicht antwortet.
 - `aipets.log`: jede Zeile mit `[tray]`, `[claude]`, `[hook hermes]` …
 - `status\<quelle>\*.txt`
 
@@ -101,7 +103,7 @@ Laufzeitdaten liegen in `%APPDATA%\aipets\`:
 - **Testen, ohne den Desktop anzufassen:**
   - **Test-exe:** mit demselben `csc`-Aufruf wie in `build.ps1`, aber `/out:aipets-test.exe`, in den aipets-Ordner kompilieren (dann findet sie `pets\`). Das laufende aipets bleibt unberührt. Danach löschen.
   - `aipets.exe --snapshot <ordner> [--pet id]` rendert jedes Pet in allen Zuständen (idle, hover, look, sleep, click, working, waiting, done, beide Blickrichtungen) als PNG, in ganzen 3×-Pixeln.
-    - `lineup.png`: alle Pets bei Größe 2 (ohne ihren eigenen Anteil) nebeneinander auf einer Grundlinie. Jeder Kopf muss die obere Linie berühren (2 × 162 px über dem Boden).
+    - `lineup.png`: alle Pets 324 px hoch (ohne ihre eigene Höhe) nebeneinander auf einer Grundlinie. Jeder Kopf muss die obere Linie 324 px über dem Boden berühren.
     - Click und working enthalten zufällige Funken und sind bei jedem Lauf anders, alle anderen Bilder bleiben byte-gleich.
     - Dazu kommt das Einstellungsfenster, mit `--pet` auf der Seite dieses Pets: `settings.png` im gespeicherten Modus, `settings-program.png`, `settings-app.png` (nur mit Desktop-App) und `settings-website.png`.
   - `aipets.exe --command <id> [--mode program|app|website]` gibt aus, was ein Klick starten würde (Terminal-Befehl, Desktop-App oder Link). `--mode` ändert dabei nichts an `settings.ini`. Fehler (Programm nicht gefunden) stehen in der Ausgabe, Exit-Code 1.
@@ -127,7 +129,7 @@ app=%LOCALAPPDATA%\hermes\…\Hermes.exe;…     ; Desktop-App für mode=app: Ap
 appfallback=desktop                          ; ohne gefundene App: das Programm mit diesen Argumenten im Terminal
 url=https://hermes-agent.nousresearch.com/   ; Website für mode=website
 status=hermes                                ; claude | hermes | codex | leer
-home=115                                     ; Abstand rechter Bildschirmrand → Zelle, in Pixeln bei Größe 1×
+home=115                                     ; Abstand rechter Bildschirmrand → Zelle, in Pixeln bei 162 px Höhe
 ```
 
 - **Einstellungen:** Die Werte hier sind Standardwerte. Was du in den Einstellungen änderst, landet in `settings.ini` und überschreibt sie. Die „zurücksetzen“-Links löschen diese Überschreibungen wieder.
@@ -154,8 +156,8 @@ home=115                                     ; Abstand rechter Bildschirmrand �
 - **`url`:** Es gelten nur http(s)-Links. Eingaben wie `gemini.google.com` bekommen `https://` davor. Alles andere (Dateipfade, `file://`, `javascript:`) wird abgelehnt: im Einstellungsfeld springt der alte Wert zurück, beim Klick kommt eine Meldung.
 - **Programm nicht installiert:** Ein Klick zeigt „… wurde nicht gefunden“ (z. B. Gemini oder Grok im Programm-Modus ohne CLI).
 - **Mehrere Pets:** Die Home-Positionen müssen sich unterscheiden, sonst sitzen die Pets übereinander.
-  - `home` wird mit der Größe malgenommen, gilt also für alle Pets gleicher Größe.
-  - Home = Home des rechten Nachbarn + dessen Zellbreite × 162 / Figurenhöhe + 4, aufgerundet. Das ist seine Breite bei 1×, siehe Abschnitt 6, „Größe“.
+  - `home` wächst mit der Höhe aller Pets (× Höhe / 162), passt also für alle Pets ohne eigene Höhe.
+  - Home = Home des rechten Nachbarn + dessen Zellbreite × 162 / Figurenhöhe + 4, aufgerundet. Das ist seine Breite bei 162 px Höhe, siehe Abschnitt 6, „Größe“.
   - Reihenfolge von rechts: Claude 12, Hermes 115, Astra 211, Gemini 334, Grok 482.
 
 ## 5. Art-Pipeline (`art/pixelkit.py` + `pets/<id>/art/make_sprites.py`)
@@ -235,7 +237,7 @@ anim <name> <sprite> <sprite> …           # optional: burst, twinkle*, z, spin
 - **Pflicht:** `normal_0`, `blink_0`, `happy_0` (+ `m_`-Varianten), Sprites `bubble_r_*`/`bubble_l_*` für `on`, `off`, `wait`, `done` und den Spinner.
 - **Optional:** `hover_0` (sonst happy), `look_0`, `sleep_0` (sonst blink), `drag_0`, `bounce_*` (sonst kein Hüpfer; „braucht dich“ wird dann Aufschauen plus Funkeln).
 - **Phasen:** Anzahl der `normal_N`-Frames.
-- **Figurenhöhe:** sichtbare Zeilen in `normal_0`. Danach richtet sich die angezeigte Größe (Abschnitt 6).
+- **Figurenhöhe:** sichtbare Zeilen in `normal_0`. Danach richtet sich der Zoom (Abschnitt 6).
 - **Partikel und Spinner:** kommen aus den `anim`-Zeilen, sonst gelten Claudes Standardnamen (`spark*`, `z*`, `spin0..4` pulsierend).
 - **Blasenseite:** folgt der Blickrichtung (`facing` XOR gespiegelt). Anker `bubble` liegt deshalb auf der Seite, in die das Pet ungespiegelt schaut.
 
@@ -245,15 +247,22 @@ anim <name> <sprite> <sprite> …           # optional: burst, twinkle*, z, spin
   - WinForms-Form mit `WS_EX_LAYERED | TOOLWINDOW | TOPMOST | NOACTIVATE`.
   - Gezeichnet wird in einen premultiplied 32-Bit-DIB, angezeigt per `UpdateLayeredWindow`.
   - `WM_MOUSEACTIVATE → MA_NOACTIVATE`: Anklicken klaut keinen Fokus.
-- **Größe:** Bei Größe n ist jedes Pet n × 162 px hoch (`SizeUnit`, die höchste Figur: Grok), egal wie viele Pixel ihr Sprite hat.
-  - n = gemeinsame Größe (`[app] size`, 1 bis 4, auch Zwischenwerte) × eigener Anteil des Pets (`[id] percent`, 50–200, Standard 100), begrenzt auf 0,5 bis 6 (`PetSettings.PetSize`).
-  - Ohne `percent` sind also alle Pets gleich hoch. Ohne `size` gilt `PetSettings.DefaultSize()`: 2 bei 96 dpi, mehr bei skalierten Anzeigen.
-  - Ändern geht über die beiden Regler (`TrayHost.SetSize` schickt allen Pets sofort `CmdReload`, `percent` geht über `ChangeSetting`) oder über das Pet-Menü (`ShareSize`, `OwnSize`). Beim Loslassen speichern Pets nur `x`/`y`.
-  - `home` wächst nur mit der gemeinsamen Größe, damit die Plätze stehen bleiben, wenn ein Pet größer wird.
-  - Figurenhöhe = Zeilen vom obersten bis zum untersten sichtbaren Pixel in `normal_0` (`Atlas.FigureHeight`): Claude 118, Astra 120, Gemini 130, Hermes 157, Grok 162.
-  - `zoom = n × 162 / Figurenhöhe` Bildschirmpixel pro Sprite-Pixel, bei 2×: Claude 2,75, Astra 2,7, Gemini 2,49, Hermes 2,06, Grok 2.
-  - Weil 162 die höchste Figur ist, liegt `zoom` schon bei 1× nie unter 1, kein Sprite-Pixel geht verloren.
-  - Gezeichnet wird mit Nearest-Neighbor und `WrapMode.TileFlipXY`. Bei krummem `zoom` sind Sprite-Pixel 2 oder 3 Bildschirmpixel breit, die Bilder selbst bleiben unverändert.
+- **Größe:** eine Höhe in Bildschirmpixeln, wie hoch die Figur dasteht, egal wie viele Pixel ihr Sprite hat. Nichts wird malgenommen.
+  - **Welche Höhe gilt:** die eigene des Pets (`[id] height`), sonst die aller Pets (`[app] height`), sonst `PetSettings.DefaultHeight()` (324 px bei 96 dpi, mehr bei skalierten Anzeigen). Siehe `PetSettings.PetHeight`/`SharedHeight`.
+  - **Grenzen:**
+    - Unten 162 px (`MinHeight`, die höchste Figur Grok bei 1:1), so geht nie ein Sprite-Pixel verloren.
+    - Oben die Höhe des Arbeitsbereichs des Bildschirms, auf dem das Pet steht (`PetForm.FitScreen`). Ein Pet kann also genau bildschirmhoch werden, nie höher.
+    - `FitHeight` prüft das beim Start, beim Neuladen, nach dem Loslassen (anderer Bildschirm) und bei Anzeigeänderungen.
+  - **Ändern:**
+    - Über die beiden Regler: `TrayHost.SetHeight` schickt allen Pets sofort `CmdReload`, die eigene Höhe geht über `ChangeSetting`.
+    - Oder über das Pet-Menü (`SetSharedHeight`, `SetOwnHeight`).
+    - Beim Loslassen speichern Pets nur `x`/`y`.
+  - `home` wächst nur mit der Höhe aller Pets, damit die Plätze stehen bleiben, wenn ein Pet eine eigene hat.
+  - **Zoom:**
+    - Figurenhöhe = Zeilen vom obersten bis zum untersten sichtbaren Pixel in `normal_0` (`Atlas.FigureHeight`): Claude 118, Astra 120, Gemini 130, Hermes 157, Grok 162.
+    - `zoom = Höhe / Figurenhöhe` Bildschirmpixel pro Sprite-Pixel, bei 324 px: Claude 2,75, Astra 2,7, Gemini 2,49, Hermes 2,06, Grok 2.
+  - Gezeichnet wird mit Nearest-Neighbor und `WrapMode.TileFlipXY`. Bei krummem `zoom` sind Sprite-Pixel mal eine Bildschirmzeile breiter als andere, die Bilder selbst bleiben unverändert.
+  - **Warum Pixel statt Faktoren:** Eine Zeit lang galt gemeinsame Größe × Prozent pro Pet. Das multiplizierte sich zu riesigen oder winzigen Pets (1× mit 50 % = 81 px). Absolute Höhen haben feste Grenzen, und der obere Regler lässt Pets mit eigener Höhe in Ruhe.
   - Zelle und Ränder werden je einmal gerundet (`CellPx`, `CanvasPxW/H`), damit die Figur genau an der Fensterunterkante endet. Der Hover-Test rechnet mit derselben Streckung zurück.
   - Pets sind Per-Monitor-DPI-aware, Tray und Einstellungen System-DPI-aware.
 - **Timer:** 33 ms bei Bewegung, 55 ms beim Spinner, sonst 80 ms. Neu gezeichnet wird nur bei Änderungen.
@@ -264,16 +273,18 @@ anim <name> <sprite> <sprite> …           # optional: burst, twinkle*, z, spin
   - Programm-Modus (`TerminalStartInfo`): `wt.exe` mit frischer Logon-Umgebung.
 - **Einstellungsfenster:** 700×540, eine Seite pro Pet.
   - Zeilen: Größe aller Pets, Größe von <Pet>, Klick öffnet, dann Programm-Zeilen (`programRows`), App-Zeilen (`appRows`) oder Website-Zeilen (`linkRows`), Statusanzeige, Buttons.
-  - Zwei `TrackBar`s (`SetupSlider`), jeder Schritt gilt sofort:
-    - „Größe aller Pets“: 4 bis 16, also Viertelschritte von 1× bis 4×, Striche bei ganzen Größen. Daneben der Wert („2,5×“).
-    - „Größe von <Pet>“: 10 bis 40, also 5-%-Schritte von 50 % bis 200 %, Striche alle 50 %. Daneben Anteil und Ergebnis („125 % · 2,5×“, `ShowSizes`).
+  - Zwei `TrackBar`s in Pixeln (`SetupSlider`): 162 bis zur Höhe des höchsten Bildschirms, Striche alle 162 px, daneben der Wert („324 px“).
+    - „Größe aller Pets“ schreibt `[app] height`. Hat das gezeigte Pet keine eigene Höhe, läuft sein Regler mit.
+    - „Größe von <Pet>“ schreibt eine eigene `height`. Der Link „wie alle“ löscht sie wieder und ist grau, solange das Pet keine eigene hat.
+    - Geschrieben wird 80 ms nach der letzten Bewegung (`sizeTimer`, `WriteHeights`), außerdem vor dem Seitenwechsel und beim Schließen. Die Pets folgen also fast sofort, ohne dass jeder Pixel die Datei neu schreibt.
+    - Solange ein Regler gezogen wird oder ein Wert noch aussteht, setzt `ShowPet` die Regler nicht zurück, sonst springt der Griff.
   - Der Arbeitsordner (`folderRows`) steht im Programm-Modus und im Desktop-App-Modus, wenn `appcommand` gilt (`Launcher.AppViaProgram`).
   - „Desktop-App“ steht nur bei Pets mit `app=`, sonst rückt „Website“ an seine Stelle (Abstand aus `PreferredSize`, damit es bei jeder DPI passt).
   - Jede Änderung wird sofort gespeichert (`TrayHost.ChangeSetting` → `settings.ini` → Nachricht an das Pet).
   - **Statusanzeige:** `HookText` sucht in der Config des Agents nach dem Pfad dieser exe, so geschrieben, wie er dort steht (JSON: `\\`; YAML/PowerShell: `''`).
     - Texte: „✓ Hooks eingerichtet“, „Keine Hooks in …“ oder „Hooks rufen eine andere aipets.exe auf“.
     - Bei den letzten beiden erscheint der Link „Hooks einrichten“ (`Setup.Hooks(quelle, App.ExePath, true)`, Ergebnis als Meldung).
-- **Rechtsklick-Menü des Pets:** öffnen, Ordner (im Programm-Modus und bei einer App über `appcommand`), Klick öffnet → Programm/Desktop-App/Website, Größe (Gruppe „Alle Pets“ 1×–4×, Gruppe „Nur <Pet>“ 75–150 %), zurück in die Ecke, ausblenden, Einstellungen, beenden.
+- **Rechtsklick-Menü des Pets:** öffnen, Ordner (im Programm-Modus und bei einer App über `appcommand`), Klick öffnet → Programm/Desktop-App/Website, Größe (Gruppe „Alle Pets“ 162/324/486/648 px, Gruppe „Nur <Pet>“: wie alle, kleiner (× 0,8), größer (× 1,25), so hoch wie der Bildschirm), zurück in die Ecke, ausblenden, Einstellungen, beenden.
   - „Desktop-App“ gibt es nur bei Pets mit `app=`. Der Tooltip zeigt die gefundene App oder was ein Klick ohne sie tut.
 - **Tray ⇄ Pet:**
   - Pets heißen `aipets.pet.<id>` (Fenstertitel), das Tray-Fenster `aipets.host`.
@@ -434,7 +445,7 @@ anim <name> <sprite> <sprite> …           # optional: burst, twinkle*, z, spin
   - `hermes desktop` prüft bei jedem Aufruf einen Hash über den Quellcode und baut bei Abweichung neu (npm, Electron). Danach wartet es, bis die App geschlossen wird. Deshalb startet der Klick die gebaute `Hermes.exe` direkt, so wie Hermes' eigene Startmenü-Verknüpfung.
   - Electron hängt sich beim Start per `AttachConsole` an die Konsole des Elternprozesses (steht in Hermes' `scripts\desktop-update\windows.ps1`). Aus einer Konsole gestartet, hält die App das Fenster offen, und Schließen beendet die App. Pets und Tray sind GUI-Prozesse ohne Konsole, der direkte Start sollte dort also unproblematisch sein (ungetestet: Hermes Desktop ist beim User nicht gebaut).
   - Das Protokoll `hermes://` kann auf eine `Hermes.exe` zeigen, die es nicht gibt (so beim User). Deshalb nie über das Protokoll starten.
-- **RadioButtons in WinForms** bilden pro Container eine Gruppe. „Klick öffnet“ steht deshalb in einem eigenen `Panel`, sonst schaltet „Website“ die Größen-Buttons ab.
+- **RadioButtons in WinForms** bilden pro Container eine Gruppe. „Klick öffnet“ steht deshalb in einem eigenen `Panel`. Als die Größe noch Radio-Buttons hatte, schaltete „Website“ sonst die Größen-Buttons ab.
 - **Icons:** `System.Drawing.Icon` liest keine PNG-komprimierten ICO-Einträge (Pillow-Standard). Daraus wird bunter Pixelmüll. Deshalb `bitmap_format="bmp"`.
 - **`new Bitmap(pfad)` sperrt die Datei**, solange das Bitmap lebt. Der Atlas wird deshalb aus dem Speicher dekodiert.
 - **Einstellungsfenster-Snapshot:**
@@ -451,7 +462,10 @@ anim <name> <sprite> <sprite> …           # optional: burst, twinkle*, z, spin
 - **Testen, ohne den User zu stören:** nicht seine Maus bewegen. `--snapshot`, `--command`, `--status`, `--dry-run` genügen. Screenshots nur lesend per BitBlt.
 - **`settings.ini` von außen ändern:** Pets lesen die Datei nur jede Sekunde neu (Zeitstempel). Nach `Store.Update` deshalb `Ipc.PostToPet(id, Ipc.CmdReload)` schicken, wie `TrayHost.ChangeSetting` es tut.
   - Früher speicherte ein Pet beim Loslassen auch seine Größe aus dem Speicher. Eine Größe, die ein Skript gerade von außen gesetzt hatte, ging so verloren.
-  - Seit die Größe für alle gilt, schreiben Pets beim Loslassen nur noch `x`/`y`.
+  - Heute schreiben Pets beim Loslassen nur noch `x`/`y`.
+- **`settings.ini` kurz nicht lesbar** (Virenscanner, Backup): `Store.Load` lieferte dann früher Standardwerte, und das Tray hätte ausgeblendete Pets gestartet.
+  - Heute versucht `Store.Read` es fünfmal im Abstand von 100 ms.
+  - Das Tray nimmt `Store.TryLoad` und behält bei einem Fehler die letzten Einstellungen. Bevor die Datei einmal gelesen ist (`iniRead`), startet es kein Pet.
 - **Autostart nur für die echte exe:** Eine Test-exe, die als Tray startet, würde sonst den Autostart auf sich umbiegen und beim Löschen kaputt hinterlassen. `ApplyDefault` prüft deshalb den Dateinamen `aipets.exe`.
 - **Snapshots schreiben nichts:** Die `PetForm`s dort werden nie angezeigt. Ohne Fenster-Handle gibt es beim `Dispose` kein `FormClosed`, also auch kein `SavePosition`.
 - **Pet „fehlt“ auf dem Desktop:** Erst Fensterliste und `settings.ini` prüfen. Der User verschiebt die Pets gern selbst, manchmal gleich nach dem Start an den Rand.

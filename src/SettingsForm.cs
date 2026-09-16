@@ -29,9 +29,15 @@ namespace AiPets
         readonly Label appName = new Label(), appWhere = new Label();
         readonly LinkLabel setupLink = new LinkLabel();
         readonly CheckBox showBox = new CheckBox(), autostartBox = new CheckBox();
-        readonly TrackBar sizeBar = new TrackBar();      // all pets, quarter steps: 4 = 1× … 16 = 4×
-        readonly TrackBar petSizeBar = new TrackBar();   // this pet, 5 % steps: 10 = 50 % … 40 = 200 %
+        // heights in screen pixels, from 162 up to the tallest screen: all pets, and this pet's own
+        readonly TrackBar sizeBar = new TrackBar(), petSizeBar = new TrackBar();
         readonly Label sizeValue = new Label(), petSizeLabel = new Label(), petSizeValue = new Label();
+        readonly LinkLabel likeAllLink = new LinkLabel();
+        // slider moves are written a moment later, so a drag does not rewrite settings.ini for every pixel
+        readonly Timer sizeTimer = new Timer { Interval = 80 };
+        int pendingShared, pendingOwn;   // 0 = nothing to write
+        PetProcess pendingOwnPet;
+        bool ownHeight;                  // the shown pet has her own height
         readonly RadioButton programMode = new RadioButton(), appMode = new RadioButton(), websiteMode = new RadioButton();
         readonly TextBox programBox = new TextBox(), argsBox = new TextBox(), dirBox = new TextBox(), urlBox = new TextBox();
         readonly ComboBox shellBox = new ComboBox();
@@ -132,6 +138,7 @@ namespace AiPets
             list.SelectedIndexChanged += delegate
             {
                 list.Invalidate();
+                WriteHeights();   // a slider just moved on the page being left
                 if (list.SelectedIndex >= 0)
                     ShowPet(pets[list.SelectedIndex]);
             };
@@ -161,15 +168,21 @@ namespace AiPets
             };
             page.Controls.AddRange(new Control[] { avatar, title, state, showBox });
 
-            // two sliders, both live: the pets follow while a slider moves
+            // two height sliders, both live: the pets follow while a slider moves.
+            // All pets: those without their own height. This pet: her own height, "wie alle" gives it back.
             int y = 128;
             AddLabel(page, "Größe aller Pets", y);
-            SetupSlider(page, sizeBar, sizeValue, y, (int)(PetSettings.MinSize * 4), (int)(PetSettings.MaxSize * 4), 4);
+            SetupSlider(page, sizeBar, sizeValue, y);
             sizeBar.ValueChanged += delegate
             {
+                if (!ownHeight)
+                    Quietly(delegate { petSizeBar.Value = sizeBar.Value; });   // she follows all pets
                 ShowSizes();
-                if (!loading && host != null)
-                    host.SetSize(sizeBar.Value / 4.0);
+                if (loading || host == null)
+                    return;
+                pendingShared = sizeBar.Value;
+                sizeTimer.Stop();
+                sizeTimer.Start();
             };
 
             y += 36;
@@ -177,15 +190,33 @@ namespace AiPets
             petSizeLabel.Location = new Point(22, y);
             petSizeLabel.ForeColor = Color.FromArgb(40, 40, 40);
             page.Controls.Add(petSizeLabel);
-            SetupSlider(page, petSizeBar, petSizeValue, y, PetSettings.MinPercent / 5, PetSettings.MaxPercent / 5, 10);
+            SetupSlider(page, petSizeBar, petSizeValue, y);
             petSizeBar.ValueChanged += delegate
             {
+                if (!loading && current != null && host != null)
+                {
+                    ownHeight = true;
+                    pendingOwn = petSizeBar.Value;
+                    pendingOwnPet = current;
+                    sizeTimer.Stop();
+                    sizeTimer.Start();
+                }
                 ShowSizes();
-                if (loading || current == null || host == null)
-                    return;
-                int percent = petSizeBar.Value * 5;
-                host.ChangeSetting(current, "percent", percent == 100 ? null : PetSettings.Number(percent));
             };
+            likeAllLink.Text = "wie alle";
+            likeAllLink.AutoSize = true;
+            likeAllLink.Location = new Point(424, y);
+            likeAllLink.LinkColor = Accent;
+            likeAllLink.LinkClicked += delegate
+            {
+                if (current == null || host == null)
+                    return;
+                WriteHeights();
+                host.ChangeSetting(current, "height", null);
+                ShowPet(current);
+            };
+            page.Controls.Add(likeAllLink);
+            sizeTimer.Tick += delegate { WriteHeights(); };
 
             y += 36;
             AddLabel(page, "Klick öffnet", y);
@@ -342,36 +373,70 @@ namespace AiPets
             return page;
         }
 
-        /// <summary>A slider in the value column with its value label behind it; ticks every tickEvery steps.</summary>
-        static void SetupSlider(Control page, TrackBar bar, Label value, int y, int min, int max, int tickEvery)
+        /// <summary>A height slider in the value column, 162 px up to the tallest screen, with its value behind it.</summary>
+        static void SetupSlider(Control page, TrackBar bar, Label value, int y)
         {
             bar.AutoSize = false;
             bar.Location = new Point(134, y - 6);
-            bar.Size = new Size(240, 34);
+            bar.Size = new Size(220, 34);
             bar.BackColor = Color.White;
-            bar.Minimum = min;
-            bar.Maximum = max;
-            bar.SmallChange = 1;
-            bar.LargeChange = tickEvery;
-            bar.TickFrequency = tickEvery;
+            bar.Minimum = PetSettings.MinHeight;
+            bar.Maximum = Math.Max(bar.Minimum + 1, TallestScreen());
+            bar.SmallChange = 10;
+            bar.LargeChange = PetSettings.HeightUnit / 2;
+            bar.TickFrequency = PetSettings.HeightUnit;   // ticks at 162, 324, 486 … px
             bar.TickStyle = TickStyle.BottomRight;
             value.AutoSize = true;
-            value.Location = new Point(380, y);
+            value.Location = new Point(360, y);
             page.Controls.AddRange(new Control[] { bar, value });
         }
 
-        /// <summary>The values behind the sliders: "2×" and "125 % · 2,5×", the size this pet ends up at.</summary>
-        void ShowSizes()
+        static int TallestScreen()
         {
-            double shared = sizeBar.Value / 4.0;
-            int percent = petSizeBar.Value * 5;
-            sizeValue.Text = PetSettings.SizeText(shared);
-            petSizeValue.Text = PetSettings.PercentText(percent) + " · " + PetSettings.SizeText(Math.Round(PetSettings.PetSize(shared, percent), 2));
+            int tallest = 0;
+            foreach (Screen screen in Screen.AllScreens)
+                tallest = Math.Max(tallest, screen.WorkingArea.Height);
+            return tallest;
         }
 
-        static void SetSlider(TrackBar bar, double value)
+        /// <summary>The heights behind the sliders; "wie alle" only does something for a pet with her own height.</summary>
+        void ShowSizes()
         {
-            bar.Value = Math.Max(bar.Minimum, Math.Min(bar.Maximum, (int)Math.Round(value)));
+            sizeValue.Text = PetSettings.HeightText(sizeBar.Value);
+            petSizeValue.Text = PetSettings.HeightText(petSizeBar.Value);
+            likeAllLink.Enabled = ownHeight;
+        }
+
+        static void SetSlider(TrackBar bar, int value)
+        {
+            bar.Value = Math.Max(bar.Minimum, Math.Min(bar.Maximum, value));
+        }
+
+        /// <summary>Moves controls without their change handlers writing anything.</summary>
+        void Quietly(Action action)
+        {
+            bool was = loading;
+            loading = true;
+            try
+            {
+                action();
+            }
+            finally
+            {
+                loading = was;
+            }
+        }
+
+        /// <summary>Writes the heights the sliders were moved to: a moment after the last move, or before leaving the page.</summary>
+        void WriteHeights()
+        {
+            sizeTimer.Stop();
+            if (host != null && pendingShared > 0)
+                host.SetHeight(pendingShared);
+            if (host != null && pendingOwn > 0 && pendingOwnPet != null)
+                host.ChangeSetting(pendingOwnPet, "height", PetSettings.Number(pendingOwn));
+            pendingShared = pendingOwn = 0;
+            pendingOwnPet = null;
         }
 
         static Label AddLabel(Control page, string text, int y)
@@ -475,8 +540,13 @@ namespace AiPets
                 state.Text = host != null ? host.StateText(p) : "–";
                 showBox.Checked = s.Enabled;
                 petSizeLabel.Text = "Größe von " + p.Info.Name;
-                SetSlider(sizeBar, (s.Size > 0 ? s.Size : PetSettings.DefaultSize()) * 4);
-                SetSlider(petSizeBar, s.Percent / 5.0);
+                // not while a slider is dragged or its value still waits to be written: the thumb would jump back
+                if (pendingShared == 0 && pendingOwn == 0 && !sizeBar.Capture && !petSizeBar.Capture)
+                {
+                    ownHeight = s.OwnHeight > 0;
+                    SetSlider(sizeBar, s.SharedHeight());
+                    SetSlider(petSizeBar, s.PetHeight());
+                }
                 ShowSizes();
                 if (!programBox.Focused) programBox.Text = s.Program;
                 if (!argsBox.Focused) argsBox.Text = s.Args;
@@ -625,7 +695,14 @@ namespace AiPets
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
             CommitAll();
+            WriteHeights();
             base.OnFormClosing(e);
+        }
+
+        protected override void OnFormClosed(FormClosedEventArgs e)
+        {
+            sizeTimer.Dispose();
+            base.OnFormClosed(e);
         }
 
         readonly Dictionary<string, Image> icons = new Dictionary<string, Image>();

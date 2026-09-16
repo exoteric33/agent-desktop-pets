@@ -100,13 +100,13 @@ namespace AiPets
     /// <summary>A pet's effective settings: the pet.ini defaults overlaid with its section in settings.ini.</summary>
     sealed class PetSettings
     {
-        public const double MinSize = 1, MaxSize = 4;
-        public const int MinPercent = 50, MaxPercent = 200;
-        const double MinPetSize = 0.5, MaxPetSize = 6;   // 6 × 162 px still fits a 1080p screen
+        // the tallest figure (Grok) at 1:1: no pet is smaller, so no sprite loses pixels;
+        // old settings counted sizes in steps of this (1×, 2× …)
+        public const int HeightUnit = 162, MinHeight = HeightUnit;
 
         public bool Enabled;
-        public double Size;         // shared by all pets ([app] size), 1 … 4; 0 = pick from display DPI
-        public int Percent;         // this pet's size in percent of the shared one ([id] percent), 50 … 200
+        public int Height;          // height of all pets in screen pixels ([app] height); 0 = from the display DPI
+        public int OwnHeight;       // this pet's own height ([id] height); 0 = the one of all pets
         public bool HasPosition;
         public int X, Y;            // bottom-centre of the pet in screen pixels
         public string WorkDir, Program, Args, Shell, Url, DesktopApp, Mode;
@@ -134,8 +134,8 @@ namespace AiPets
             string id = pet.Id;
             var s = new PetSettings();
             s.Enabled = ini.Get(id, "enabled") != "0";
-            s.Size = SizeOf(ini, id);
-            s.Percent = Math.Max(MinPercent, Math.Min(MaxPercent, ini.GetInt(id, "percent", 100)));
+            s.Height = HeightOf(ini, "app");
+            s.OwnHeight = HeightOf(ini, id);
             s.HasPosition = ini.Get(id, "x") != null && ini.Get(id, "y") != null;
             s.X = ini.GetInt(id, "x", 0);
             s.Y = ini.GetInt(id, "y", 0);
@@ -165,57 +165,41 @@ namespace AiPets
             return mode == "website" || mode == "app" ? mode : "program";
         }
 
-        /// <summary>
-        /// The size all pets share ([app] size). Older settings had one per pet (scale): the tray moves
-        /// it over when it starts, a pet started on its own still reads it.
-        /// </summary>
-        static double SizeOf(Ini ini, string id)
+        /// <summary>A height key: 0 if unset or not a number, otherwise at least MinHeight (the screen limit is the pet's business).</summary>
+        static int HeightOf(Ini ini, string section)
         {
-            double size;
-            string text = ini.Get("app", "size") ?? ini.Get(id, "scale");
-            if (text == null || !double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out size) || size <= 0)
-                return 0;
-            return Math.Max(MinSize, Math.Min(MaxSize, size));
+            int px = ini.GetInt(section, "height", 0);
+            return px <= 0 ? 0 : Math.Max(MinHeight, px);
         }
 
-        /// <summary>The size this pet is shown at: the shared one (or the display default) times her own percentage.</summary>
-        public double PetSize()
+        /// <summary>The height of all pets without their own: the setting or the display default.</summary>
+        public int SharedHeight()
         {
-            return PetSize(Size > 0 ? Size : DefaultSize(), Percent);
+            return Height > 0 ? Height : DefaultHeight();
         }
 
-        public static double PetSize(double shared, int percent)
+        /// <summary>The height this pet asks for; the pet keeps it within the screen she stands on.</summary>
+        public int PetHeight()
         {
-            return Math.Max(MinPetSize, Math.Min(MaxPetSize, shared * percent / 100.0));
+            return OwnHeight > 0 ? OwnHeight : SharedHeight();
         }
 
-        /// <summary>The size without a setting: 2 on a 96-dpi display, more on scaled ones.</summary>
-        public static double DefaultSize()
+        /// <summary>Without a setting: 324 px on a 96-dpi display, more on scaled ones.</summary>
+        public static int DefaultHeight()
         {
             using (Graphics g = Graphics.FromHwnd(IntPtr.Zero))
-                return Math.Max(MinSize, Math.Min(MaxSize, Math.Round(2 * g.DpiX / 96.0)));
+                return Math.Max(1, (int)Math.Round(2 * g.DpiX / 96.0)) * HeightUnit;
         }
 
-        /// <summary>"2,5×"</summary>
-        public static string SizeText(double size)
+        /// <summary>"324 px"</summary>
+        public static string HeightText(int px)
         {
-            return size.ToString("0.##", CultureInfo.InvariantCulture).Replace('.', ',') + "×";
-        }
-
-        /// <summary>"125 %"</summary>
-        public static string PercentText(int percent)
-        {
-            return Number(percent) + " %";
+            return Number(px) + " px";
         }
 
         public static string Number(int n)
         {
             return n.ToString(CultureInfo.InvariantCulture);
-        }
-
-        public static string Number(double n)
-        {
-            return n.ToString("0.##", CultureInfo.InvariantCulture);
         }
     }
 }

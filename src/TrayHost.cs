@@ -54,6 +54,7 @@ namespace AiPets
 
         Ini ini = new Ini();
         DateTime iniStamp = DateTime.MinValue;
+        bool iniRead;   // settings.ini was read once: before that no pet starts, a hidden one would show up
         SettingsForm settingsForm;
         bool quitting;
 
@@ -64,9 +65,9 @@ namespace AiPets
             foreach (PetInfo info in PetInfo.Discover())
                 Pets.Add(new PetProcess(info));
             ReloadIni();
-            if (!dryRun)
+            if (!dryRun && iniRead)
             {
-                MoveSizesToApp();
+                MoveSizesToHeights();
                 try { Autostart.ApplyDefault(ini); }
                 catch (Exception ex) { Log.Write("autostart: " + ex.Message); }
             }
@@ -110,62 +111,84 @@ namespace AiPets
 
         // ------------------------------------------------------------------ pet processes
 
+        /// <summary>Unreadable settings (locked for a moment) keep the last ones; the next second tries again.</summary>
         void ReloadIni()
         {
-            iniStamp = Store.Stamp();
-            ini = Store.Load();
+            DateTime stamp = Store.Stamp();
+            Ini loaded;
+            if (!Store.TryLoad(out loaded))
+                return;
+            iniStamp = stamp;
+            ini = loaded;
+            iniRead = true;
         }
 
         /// <summary>
-        /// Settings from before had a size per pet (scale). All pets share one now ([app] size): the most
-        /// common of the old ones (the larger on a tie). A pet that had another size keeps it as her own
-        /// percentage; the old keys go.
+        /// Older settings counted sizes in steps of 162 px: one per pet (scale), later one for all ([app] size)
+        /// with a share per pet (percent). Now they are heights in screen pixels: [app] height for all pets,
+        /// [id] height for a pet with her own. Runs once; the old keys go.
         /// </summary>
-        void MoveSizesToApp()
+        void MoveSizesToHeights()
         {
-            if (ini.Get("app", "size") != null)
+            if (ini.Get("app", "height") != null)
                 return;
-            double size = CommonOldSize(ini, Pets);
-            if (size == 0)
+            double shared = OldSize(ini.Get("app", "size"));
+            if (shared == 0)
+                shared = CommonOldSize(ini, Pets);
+            if (shared == 0)
                 return;
-            Store.Update("app", "size", PetSettings.Number(size));
+            int all = ToHeight(shared);
+            Store.Update("app", "height", PetSettings.Number(all), "size", null);
             foreach (PetProcess p in Pets)
             {
-                string old = ini.Get(p.Info.Id, "scale");
-                if (old == null)
+                string id = p.Info.Id;
+                if (ini.Get(id, "scale") == null && ini.Get(id, "percent") == null)
                     continue;
-                int percent = OldPercent(old, size);
-                Store.Update(p.Info.Id, "scale", null, "percent", percent == 100 ? null : PetSettings.Number(percent));
+                int own = ToHeight(OwnOldSize(ini, id, shared));
+                Store.Update(id, "scale", null, "percent", null, "height", own == all ? null : PetSettings.Number(own));
             }
-            Log.Write("size " + PetSettings.Number(size) + " for all pets (was set per pet)");
+            Log.Write("sizes now heights: " + all + " px for all pets");
             ReloadIni();
         }
 
-        /// <summary>An old per-pet size as a share of the new shared one, in 5 % steps; 100 if unreadable.</summary>
-        public static int OldPercent(string oldScale, double size)
+        /// <summary>An old size in pixels, never below the smallest height (an old 50 % could mean 81 px).</summary>
+        static int ToHeight(double oldSize)
         {
-            double old;
-            if (!double.TryParse(oldScale, NumberStyles.Float, CultureInfo.InvariantCulture, out old) || old <= 0 || size <= 0)
-                return 100;
-            int percent = (int)Math.Round(old / size * 20) * 5;
-            return Math.Max(PetSettings.MinPercent, Math.Min(PetSettings.MaxPercent, percent));
+            return Math.Max(PetSettings.MinHeight, (int)Math.Round(oldSize * PetSettings.HeightUnit));
         }
 
-        /// <summary>The most common per-pet size (the larger on a tie), within the slider's range; 0 if there is none.</summary>
+        /// <summary>An old size (a multiple of 162 px), or 0.</summary>
+        public static double OldSize(string text)
+        {
+            double size;
+            return double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out size) && size > 0 ? size : 0;
+        }
+
+        /// <summary>A pet's old size: the shared one times her percent (last version), else her own scale (first versions), else the shared one.</summary>
+        public static double OwnOldSize(Ini settings, string id, double shared)
+        {
+            int percent = settings.GetInt(id, "percent", 0);
+            if (percent > 0)
+                return shared * percent / 100.0;
+            double scale = OldSize(settings.Get(id, "scale"));
+            return scale > 0 ? scale : shared;
+        }
+
+        /// <summary>The most common per-pet size of the first versions (the larger on a tie), or 0.</summary>
         public static double CommonOldSize(Ini settings, List<PetProcess> pets)
         {
             var counts = new Dictionary<double, int>();
             foreach (PetProcess p in pets)
             {
-                double old;
-                if (double.TryParse(settings.Get(p.Info.Id, "scale"), NumberStyles.Float, CultureInfo.InvariantCulture, out old) && old > 0)
+                double old = OldSize(settings.Get(p.Info.Id, "scale"));
+                if (old > 0)
                     counts[old] = (counts.ContainsKey(old) ? counts[old] : 0) + 1;
             }
             double size = 0;
             foreach (KeyValuePair<double, int> kv in counts)
                 if (size == 0 || kv.Value > counts[size] || (kv.Value == counts[size] && kv.Key > size))
                     size = kv.Key;
-            return size == 0 ? 0 : Math.Max(PetSettings.MinSize, Math.Min(PetSettings.MaxSize, size));
+            return size;
         }
 
         void Supervise()
@@ -175,7 +198,7 @@ namespace AiPets
             long now = clock.ElapsedMilliseconds;
             foreach (PetProcess p in Pets)
             {
-                bool wanted = !quitting && p.Info.HasSprites && SettingsOf(p).Enabled;
+                bool wanted = iniRead && !quitting && p.Info.HasSprites && SettingsOf(p).Enabled;
                 if (p.Proc != null && p.Proc.HasExited)
                     Exited(p, now, wanted);
                 if (p.Proc == null)
@@ -297,10 +320,10 @@ namespace AiPets
             Ipc.PostToPet(p.Info.Id, Ipc.CmdReload);
         }
 
-        /// <summary>The size slider: one size for all pets, applied right away.</summary>
-        public void SetSize(double size)
+        /// <summary>The slider for all pets: their height in screen pixels, applied right away (pets with their own keep it).</summary>
+        public void SetHeight(int px)
         {
-            Store.Update("app", "size", PetSettings.Number(size));
+            Store.Update("app", "height", PetSettings.Number(px));
             ReloadIni();
             foreach (PetProcess p in Pets)
                 Ipc.PostToPet(p.Info.Id, Ipc.CmdReload);

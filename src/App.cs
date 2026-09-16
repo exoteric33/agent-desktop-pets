@@ -110,6 +110,20 @@ namespace AiPets
             return ini ?? new Ini();
         }
 
+        /// <summary>Like Load, but false when the file exists and cannot be read: no defaults in place of real settings.</summary>
+        public static bool TryLoad(out Ini ini)
+        {
+            Ini loaded = null;
+            bool read = false;
+            Locked(delegate
+            {
+                loaded = Read();
+                read = true;
+            });
+            ini = read ? (loaded ?? new Ini()) : null;
+            return read;
+        }
+
         /// <summary>Changes keys of one section: Update("hermes", "x", "10", "y", null) — null removes.</summary>
         public static void Update(string section, params string[] keyValues)
         {
@@ -135,7 +149,19 @@ namespace AiPets
 
         static Ini Read()
         {
-            return File.Exists(FilePath) ? Ini.Parse(File.ReadAllLines(FilePath), "app") : null;
+            for (int attempt = 1; ; attempt++)
+            {
+                try
+                {
+                    return File.Exists(FilePath) ? Ini.Parse(File.ReadAllLines(FilePath), "app") : null;
+                }
+                catch (IOException)
+                {
+                    if (attempt == 5)
+                        throw;
+                    Thread.Sleep(100);   // locked for a moment (virus scanner, backup): better late than defaults
+                }
+            }
         }
 
         static void Locked(Action action)
