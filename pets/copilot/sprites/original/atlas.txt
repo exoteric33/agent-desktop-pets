@@ -1,0 +1,148 @@
+cell 136 168
+density 4
+frame normal_0 1 1
+frame normal_1 139 1
+frame normal_2 277 1
+frame normal_3 415 1
+frame normal_4 553 1
+frame normal_5 691 1
+frame normal_6 829 1
+frame normal_7 967 1
+frame blink_0 1 171
+frame blink_1 139 171
+frame blink_2 277 171
+frame blink_3 415 171
+frame blink_4 553 171
+frame blink_5 691 171
+frame blink_6 829 171
+frame blink_7 967 171
+frame hover_0 1 341
+frame hover_1 139 341
+frame hover_2 277 341
+frame hover_3 415 341
+frame hover_4 553 341
+frame hover_5 691 341
+frame hover_6 829 341
+frame hover_7 967 341
+frame look_0 1 511
+frame look_1 139 511
+frame look_2 277 511
+frame look_3 415 511
+frame look_4 553 511
+frame look_5 691 511
+frame look_6 829 511
+frame look_7 967 511
+frame happy_0 1 681
+frame happy_1 139 681
+frame happy_2 277 681
+frame happy_3 415 681
+frame happy_4 553 681
+frame happy_5 691 681
+frame happy_6 829 681
+frame happy_7 967 681
+frame sleep_0 1 851
+frame sleep_1 139 851
+frame sleep_2 277 851
+frame sleep_3 415 851
+frame sleep_4 553 851
+frame sleep_5 691 851
+frame sleep_6 829 851
+frame sleep_7 967 851
+frame bounce_-2 1 1021
+frame bounce_-1 139 1021
+frame bounce_1 277 1021
+frame bounce_2 415 1021
+frame bounce_3 553 1021
+frame m_normal_0 691 1021
+frame m_normal_1 829 1021
+frame m_normal_2 967 1021
+frame m_normal_3 1 1191
+frame m_normal_4 139 1191
+frame m_normal_5 277 1191
+frame m_normal_6 415 1191
+frame m_normal_7 553 1191
+frame m_blink_0 691 1191
+frame m_blink_1 829 1191
+frame m_blink_2 967 1191
+frame m_blink_3 1 1361
+frame m_blink_4 139 1361
+frame m_blink_5 277 1361
+frame m_blink_6 415 1361
+frame m_blink_7 553 1361
+frame m_hover_0 691 1361
+frame m_hover_1 829 1361
+frame m_hover_2 967 1361
+frame m_hover_3 1 1531
+frame m_hover_4 139 1531
+frame m_hover_5 277 1531
+frame m_hover_6 415 1531
+frame m_hover_7 553 1531
+frame m_look_0 691 1531
+frame m_look_1 829 1531
+frame m_look_2 967 1531
+frame m_look_3 1 1701
+frame m_look_4 139 1701
+frame m_look_5 277 1701
+frame m_look_6 415 1701
+frame m_look_7 553 1701
+frame m_happy_0 691 1701
+frame m_happy_1 829 1701
+frame m_happy_2 967 1701
+frame m_happy_3 1 1871
+frame m_happy_4 139 1871
+frame m_happy_5 277 1871
+frame m_happy_6 415 1871
+frame m_happy_7 553 1871
+frame m_sleep_0 691 1871
+frame m_sleep_1 829 1871
+frame m_sleep_2 967 1871
+frame m_sleep_3 1 2041
+frame m_sleep_4 139 2041
+frame m_sleep_5 277 2041
+frame m_sleep_6 415 2041
+frame m_sleep_7 553 2041
+frame m_bounce_-2 691 2041
+frame m_bounce_-1 829 2041
+frame m_bounce_1 967 2041
+frame m_bounce_2 1 2211
+frame m_bounce_3 139 2211
+sprite spark3 0 2380 8 8 4 4
+sprite spark2 9 2380 6 6 3 3
+sprite spark1 16 2380 4 4 2 2
+sprite spark0 21 2380 2 2 1 1
+sprite z2 24 2380 6 6 3 3
+sprite z1 31 2380 5 5 2 2
+sprite z0 37 2380 4 4 2 2
+sprite star2 42 2380 6 6 3 3
+sprite star1 49 2380 4 4 2 2
+sprite bubble_r_on 54 2380 22 17 0 16
+sprite bubble_r_off 77 2380 22 17 0 16
+sprite bubble_r_spin0 100 2380 22 17 0 16
+sprite bubble_r_spin1 123 2380 22 17 0 16
+sprite bubble_r_spin2 146 2380 22 17 0 16
+sprite bubble_r_spin3 169 2380 22 17 0 16
+sprite bubble_r_spin4 192 2380 22 17 0 16
+sprite bubble_r_spin5 215 2380 22 17 0 16
+sprite bubble_r_spin6 238 2380 22 17 0 16
+sprite bubble_r_spin7 261 2380 22 17 0 16
+sprite bubble_r_wait 284 2380 22 17 0 16
+sprite bubble_r_done 307 2380 22 17 0 16
+sprite bubble_l_on 330 2380 22 17 21 16
+sprite bubble_l_off 353 2380 22 17 21 16
+sprite bubble_l_spin0 376 2380 22 17 21 16
+sprite bubble_l_spin1 399 2380 22 17 21 16
+sprite bubble_l_spin2 422 2380 22 17 21 16
+sprite bubble_l_spin3 445 2380 22 17 21 16
+sprite bubble_l_spin4 468 2380 22 17 21 16
+sprite bubble_l_spin5 491 2380 22 17 21 16
+sprite bubble_l_spin6 514 2380 22 17 21 16
+sprite bubble_l_spin7 537 2380 22 17 21 16
+sprite bubble_l_wait 560 2380 22 17 21 16
+sprite bubble_l_done 583 2380 22 17 21 16
+anchor bubble 45 19
+anchor zzz 65 15
+anchor head 64 41
+anchor logo 67 82
+facing left
+anim twinkle star1 star1 star2 star2 star1 spark0
+anim spin spin0 spin1 spin2 spin3 spin4 spin5 spin6 spin7
