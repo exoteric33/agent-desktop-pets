@@ -46,9 +46,9 @@ namespace AiPets
         readonly Stopwatch clock = Stopwatch.StartNew();
         readonly Random rng = new Random();
         readonly List<Particle> particles = new List<Particle>();
-        readonly List<string> layerOrder = new List<string>();   // all pet ids in menu order: the first one stands in front
+        readonly List<PetInfo> allPets;                           // every pet, for the stacking order and messages
+        List<string> layerOrder;                                  // pet ids front to back (Layers.Order)
         readonly List<int> ownProcesses = new List<int>();       // this pet and the tray: their menus stay above every pet
-        readonly int layerRank;
 
         // what this atlas offers
         bool canBounce, hasHover, hasLook, hasSleep, hasDrag;
@@ -94,9 +94,8 @@ namespace AiPets
             settings = PetSettings.From(pet, initial);
             LoadAppearance(settings.Style);
             status = pet.Status.Length > 0 ? new StatusMonitor(pet.Status) : null;
-            foreach (PetInfo other in PetInfo.Discover())
-                layerOrder.Add(other.Id);
-            layerRank = layerOrder.IndexOf(pet.Id);
+            allPets = PetInfo.Discover();
+            layerOrder = Layers.Order(initial, allPets);
             ownProcesses.Add(Process.GetCurrentProcess().Id);
             if (host != null)
                 ownProcesses.Add(host.Id);
@@ -157,7 +156,7 @@ namespace AiPets
             }
             base.WndProc(ref m);
             // Windows moved her in the z-order, e.g. to the top together with her menu or a dialog: back into her layer at once
-            if (m.Msg == Native.WM_WINDOWPOSCHANGED && !restacking && !dragging && !hiddenForFullscreen && Native.ZOrderChanged(m.LParam))
+            if (m.Msg == Native.WM_WINDOWPOSCHANGED && !restacking && !hiddenForFullscreen && Native.ZOrderChanged(m.LParam))
                 Restack();
         }
 
@@ -339,6 +338,15 @@ namespace AiPets
                 return;
             settingsStamp = stamp;
             PetSettings s = PetSettings.From(pet, loaded);
+            List<string> order = Layers.Order(loaded, allPets);
+            bool reordered = string.Join(",", order.ToArray()) != string.Join(",", layerOrder.ToArray());
+            layerOrder = order;
+            if (reordered && IsHandleCreated && !hiddenForFullscreen)
+            {
+                // another pet was dragged to the front: take the new place at once, with a new turn on the grid
+                nextRestack = Layers.NextCheck(StatusEntry.UnixNow(), order.IndexOf(pet.Id));
+                Restack();
+            }
             bool appearanceChanged = s.Style != loadedStyle;
             if (appearanceChanged)
             {
@@ -449,9 +457,9 @@ namespace AiPets
                 nextFullscreenCheck = now + 1000;
             }
             long wall = StatusEntry.UnixNow();
-            if (!dragging && !hiddenForFullscreen && wall >= nextRestack)
+            if (!hiddenForFullscreen && wall >= nextRestack)
             {
-                nextRestack = Layers.NextCheck(wall, layerRank);
+                nextRestack = Layers.NextCheck(wall, layerOrder.IndexOf(pet.Id));
                 Restack();
             }
             particles.RemoveAll(p => now - p.Born >= p.Life);
@@ -464,7 +472,7 @@ namespace AiPets
         }
 
         /// <summary>
-        /// Her fixed layer: above other programs' topmost windows, below the pets before her in the menu
+        /// Her fixed layer: above other programs' topmost windows, below the pets in front of her
         /// and below every menu and dialog of aipets (see Layers).
         /// </summary>
         void Restack()
@@ -894,12 +902,34 @@ namespace AiPets
             Point c = Cursor.Position;
             Size slop = SystemInformation.DragSize;
             if (!dragging && (Math.Abs(c.X - pressCursor.X) > slop.Width || Math.Abs(c.Y - pressCursor.Y) > slop.Height))
-            {
-                dragging = true;
-                sleeping = false;
-            }
+                StartDrag();
             if (dragging)
                 MoveTo(new Point(pressAnchor.X + c.X - pressCursor.X, pressAnchor.Y + c.Y - pressCursor.Y), false);
+        }
+
+        void StartDrag()
+        {
+            dragging = true;
+            sleeping = false;
+            TakeFrontLayer();
+        }
+
+        /// <summary>
+        /// The pet you drag comes to the front and stays there, like a window in Windows. The new order is
+        /// saved ([app] layers), and every other pet takes her place behind her at once.
+        /// </summary>
+        void TakeFrontLayer()
+        {
+            if (layerOrder.IndexOf(pet.Id) != 0)
+            {
+                Store.Change(delegate(Ini ini) { Layers.BringToFront(ini, pet.Id, allPets); });
+                layerOrder.Remove(pet.Id);
+                layerOrder.Insert(0, pet.Id);
+                foreach (PetInfo other in allPets)
+                    if (other.Id != pet.Id)
+                        Ipc.PostToPet(other.Id, Ipc.CmdReload);
+            }
+            Restack();
         }
 
         protected override void OnMouseUp(MouseEventArgs e)
@@ -938,6 +968,7 @@ namespace AiPets
             if (height != before)
                 MoveTo(anchor, true);
             SavePosition();
+            Restack();   // she stays in front where she was dropped
         }
 
         void OpenAgent()

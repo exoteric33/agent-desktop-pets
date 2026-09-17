@@ -4,15 +4,43 @@ using System.Collections.Generic;
 namespace AiPets
 {
     /// <summary>
-    /// Fixed layers. Overlapping pets stack in menu order (the first pet in front), and the menus,
-    /// dialogs and tooltips of aipets stay above every pet. Each pet moves only herself, directly
-    /// below the lowest window she must not cover, and only when she is not there yet. Before, every
-    /// pet jumped to the very top every few seconds: overlapping pets kept swapping places, and a pet
-    /// could cover an open menu.
+    /// Fixed layers. Overlapping pets stack in a fixed order (Order): the pet dragged last stands in front,
+    /// like a window in Windows, and without dragging the menu order holds. The menus, dialogs and tooltips
+    /// of aipets stay above every pet. Each pet moves only herself, directly below the lowest window she must
+    /// not cover, and only when she is not there yet. Before, every pet jumped to the very top every few
+    /// seconds: overlapping pets kept swapping places, and a pet could cover an open menu.
     /// </summary>
     static class Layers
     {
         public const int CycleMs = 3000, StepMs = 200, RetryMs = 100;
+
+        /// <summary>
+        /// Pet ids from the front to the back. [app] layers in settings.ini keeps the order the user made by
+        /// dragging; pets missing there follow in menu order. Without the key it is the menu order.
+        /// </summary>
+        public static List<string> Order(Ini settings, IList<PetInfo> pets)
+        {
+            var order = new List<string>();
+            foreach (string part in (settings.Get("app", "layers") ?? "").Split(','))
+            {
+                string id = part.Trim().ToLowerInvariant();
+                if (id.Length > 0 && !order.Contains(id))
+                    order.Add(id);   // ids of pets this process does not know keep their place for the others
+            }
+            foreach (PetInfo pet in pets)
+                if (!order.Contains(pet.Id))
+                    order.Add(pet.Id);
+            return order;
+        }
+
+        /// <summary>A pet that is dragged comes to the front and stays there: saves the new order.</summary>
+        public static void BringToFront(Ini settings, string id, IList<PetInfo> pets)
+        {
+            List<string> order = Order(settings, pets);
+            order.Remove(id);
+            order.Insert(0, id);
+            settings.Set("app", "layers", string.Join(",", order.ToArray()));
+        }
 
         /// <summary>A visible window of the topmost band.</summary>
         public struct Window
