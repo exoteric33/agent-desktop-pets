@@ -30,7 +30,8 @@ try {
         $running | Stop-Process -Force
         $running | Wait-Process -Timeout 10 -ErrorAction SilentlyContinue
     }
-    if ([IO.File]::Exists($exe)) { [IO.File]::Replace($candidate, $exe, $null) }
+    # [NullString]::Value: PowerShell would pass $null as "" (invalid backup path)
+    if ([IO.File]::Exists($exe)) { [IO.File]::Replace($candidate, $exe, [NullString]::Value) }
     else { [IO.File]::Move($candidate, $exe) }
     Write-Host "built $exe"
 } finally {

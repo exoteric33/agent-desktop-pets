@@ -45,6 +45,9 @@ namespace AiPets
         readonly Stopwatch clock = Stopwatch.StartNew();
         readonly Random rng = new Random();
         readonly List<Particle> particles = new List<Particle>();
+        readonly List<string> layerOrder = new List<string>();   // all pet ids in menu order: the first one stands in front
+        readonly List<int> ownProcesses = new List<int>();       // this pet and the tray: their menus stay above every pet
+        readonly int layerRank;
 
         // what this atlas offers
         readonly bool canBounce, hasHover, hasLook, hasSleep, hasDrag;
@@ -64,11 +67,13 @@ namespace AiPets
         long now;
         int phase;
         long phaseAt, blinkUntil, nextBlink, secondBlinkAt = -1, happyUntil, smileUntil, lookUntil, bounceAt = -1;
-        long nextIdleAction, nextZ, hoverSince, nextTopmost, nextFullscreenCheck, nextHousekeeping;
+        long nextIdleAction, nextZ, hoverSince, nextFullscreenCheck, nextHousekeeping;
+        long nextRestack;           // unix ms (Layers.NextCheck): the pets take turns
         long hintUntil = 2800;      // show the prompt bubble once after start
         long lastLaunch = long.MinValue / 2;
         bool sleeping, hovered, menuOpen, hiddenForFullscreen;
         bool pressed, dragging;
+        bool restacking;
         Point pressCursor, pressAnchor;
 
         // agent activity reported by hooks (see Status.cs); done times are unix ms
@@ -100,6 +105,12 @@ namespace AiPets
             twinkles = atlas.AnimsWithPrefix("twinkle");
             if (twinkles.Count == 0)
                 twinkles.Add(SparkFrames);
+            foreach (PetInfo other in PetInfo.Discover())
+                layerOrder.Add(other.Id);
+            layerRank = layerOrder.IndexOf(pet.Id);
+            ownProcesses.Add(Process.GetCurrentProcess().Id);
+            if (host != null)
+                ownProcesses.Add(host.Id);
 
             FormBorderStyle = FormBorderStyle.None;
             ShowInTaskbar = false;
@@ -156,12 +167,16 @@ namespace AiPets
                 return;
             }
             base.WndProc(ref m);
+            // Windows moved her in the z-order, e.g. to the top together with her menu or a dialog: back into her layer at once
+            if (m.Msg == Native.WM_WINDOWPOSCHANGED && !restacking && !dragging && !hiddenForFullscreen && Native.ZOrderChanged(m.LParam))
+                Restack();
         }
 
         protected override void OnHandleCreated(EventArgs e)
         {
             base.OnHandleCreated(e);
             ApplyHeight(height);
+            Restack();   // a new window starts on top of everything: into her layer before she shows up
             timer.Start();
         }
 
@@ -393,10 +408,11 @@ namespace AiPets
                 hiddenForFullscreen = !dragging && Native.FullscreenAppActive(Handle);
                 nextFullscreenCheck = now + 1000;
             }
-            if (!menuOpen && !dragging && !hiddenForFullscreen && now >= nextTopmost)
+            long wall = StatusEntry.UnixNow();
+            if (!dragging && !hiddenForFullscreen && wall >= nextRestack)
             {
-                Native.KeepTopmost(Handle);
-                nextTopmost = now + 3000;
+                nextRestack = Layers.NextCheck(wall, layerRank);
+                Restack();
             }
             particles.RemoveAll(p => now - p.Born >= p.Life);
             Render(false);
@@ -405,6 +421,24 @@ namespace AiPets
             int interval = particles.Count > 0 || bounceAt >= 0 || pressed ? 33 : agent == AgentState.Working ? 55 : 80;
             if (timer.Interval != interval)
                 timer.Interval = interval;
+        }
+
+        /// <summary>
+        /// Her fixed layer: above other programs' topmost windows, below the pets before her in the menu
+        /// and below every menu and dialog of aipets (see Layers).
+        /// </summary>
+        void Restack()
+        {
+            restacking = true;   // her own move is no reason to restack again
+            try
+            {
+                if (!Layers.Restack(Handle, pet.Id, layerOrder, ownProcesses))
+                    nextRestack = StatusEntry.UnixNow() + Layers.RetryMs;   // windows were still moving: again shortly
+            }
+            finally
+            {
+                restacking = false;
+            }
         }
 
         void UpdateHover()

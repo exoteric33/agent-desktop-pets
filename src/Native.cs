@@ -17,11 +17,15 @@ namespace AiPets
         public const int WM_CLOSE = 0x10;
         public const int WM_COPYDATA = 0x4A;
         public const int WM_MOUSEACTIVATE = 0x21;
+        public const int WM_WINDOWPOSCHANGED = 0x47;
         public const int WM_APP = 0x8000;
         public const int MA_NOACTIVATE = 3;
 
         const int ULW_ALPHA = 2;
-        const uint SWP_NOSIZE = 0x1, SWP_NOMOVE = 0x2, SWP_NOACTIVATE = 0x10;
+        const uint SWP_NOSIZE = 0x1, SWP_NOMOVE = 0x2, SWP_NOZORDER = 0x4, SWP_NOACTIVATE = 0x10, SWP_NOOWNERZORDER = 0x200;
+        const uint GW_HWNDFIRST = 0, GW_HWNDLAST = 1, GW_HWNDNEXT = 2, GW_HWNDPREV = 3;
+        const int GWL_EXSTYLE = -20;
+        const int MaxWindows = 10000;   // z-order walks end here even if windows reshuffle meanwhile
         static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
         static readonly IntPtr DPI_AWARENESS_CONTEXT_SYSTEM_AWARE = new IntPtr(-2);
         static readonly IntPtr DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = new IntPtr(-4);
@@ -47,6 +51,9 @@ namespace AiPets
         public struct COPYDATASTRUCT { public IntPtr dwData; public int cbData; public IntPtr lpData; }
 
         [StructLayout(LayoutKind.Sequential)]
+        struct WINDOWPOS { public IntPtr hwnd, hwndInsertAfter; public int x, y, cx, cy; public uint flags; }
+
+        [StructLayout(LayoutKind.Sequential)]
         struct LASTINPUTINFO { public int cbSize; public uint dwTime; }
 
         [DllImport("user32.dll", SetLastError = true)]
@@ -63,6 +70,12 @@ namespace AiPets
             out IntPtr bits, IntPtr section, uint offset);
         [DllImport("user32.dll")] static extern bool GetLastInputInfo(ref LASTINPUTINFO info);
         [DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr hwnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
+        [DllImport("user32.dll")] static extern IntPtr GetTopWindow(IntPtr hwnd);
+        [DllImport("user32.dll")] static extern IntPtr GetWindow(IntPtr hwnd, uint cmd);
+        [DllImport("user32.dll")] static extern int GetWindowLong(IntPtr hwnd, int index);
+        [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr hwnd);
+        [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hwnd, out int processId);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr hwnd, StringBuilder text, int size);
         [DllImport("user32.dll")] static extern bool SetProcessDpiAwarenessContext(IntPtr value);
         [DllImport("user32.dll")] static extern bool SetProcessDPIAware();
         [DllImport("shell32.dll")] static extern int SHQueryUserNotificationState(out int state);
@@ -204,9 +217,93 @@ namespace AiPets
             return unchecked((uint)Environment.TickCount - info.dwTime);
         }
 
-        public static void KeepTopmost(IntPtr hwnd)
+        /// <summary>
+        /// The shown topmost windows, from the top of the z-order down (see Layers), or null while windows move.
+        /// A walk is no snapshot: a window that moves meanwhile can be missed or seen twice, so two walks must agree.
+        /// </summary>
+        public static List<Layers.Window> TopmostWindows()
         {
-            SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+            List<Layers.Window> first = WalkTopmost(), second = WalkTopmost();
+            if (first == null || second == null || first.Count != second.Count)
+                return null;
+            for (int i = 0; i < first.Count; i++)
+                if (first[i].Handle != second[i].Handle)
+                    return null;
+            return first;
+        }
+
+        /// <summary>One walk over all windows; null if it broke off because a window vanished on the way.</summary>
+        static List<Layers.Window> WalkTopmost()
+        {
+            var band = new List<Layers.Window>();
+            IntPtr hwnd = GetTopWindow(IntPtr.Zero), last = IntPtr.Zero;
+            for (int i = 0; hwnd != IntPtr.Zero && i < MaxWindows; i++)
+            {
+                // topmost windows can also sit further down, hidden ones even below normal windows: walk everything
+                if (IsTopmost(hwnd) && Shown(hwnd))
+                {
+                    int pid;
+                    GetWindowThreadProcessId(hwnd, out pid);
+                    // no message for other processes' windows, so a hung program cannot stall the pet
+                    var title = new StringBuilder(256);
+                    GetWindowText(hwnd, title, title.Capacity);
+                    band.Add(new Layers.Window { Handle = hwnd, ProcessId = pid, Title = title.ToString() });
+                }
+                last = hwnd;
+                hwnd = GetWindow(hwnd, GW_HWNDNEXT);
+            }
+            bool complete = hwnd == IntPtr.Zero && last != IntPtr.Zero && GetWindow(last, GW_HWNDLAST) == last;
+            return complete ? band : null;
+        }
+
+        public static bool IsTopmost(IntPtr hwnd)
+        {
+            return (GetWindowLong(hwnd, GWL_EXSTYLE) & WS_EX_TOPMOST) != 0;
+        }
+
+        /// <summary>Visible and not empty: helper windows without any area (input indicator) cover nothing.</summary>
+        static bool Shown(IntPtr hwnd)
+        {
+            RECT r;
+            return IsWindowVisible(hwnd) && GetWindowRect(hwnd, out r) && r.Right > r.Left && r.Bottom > r.Top;
+        }
+
+        /// <summary>
+        /// The nearest shown window above this one in the z-order, IntPtr.Zero at the very top,
+        /// or HWND_TOPMOST (never a real window) if the walk broke off.
+        /// </summary>
+        public static IntPtr VisibleWindowAbove(IntPtr hwnd)
+        {
+            for (int i = 0; i < MaxWindows; i++)
+            {
+                IntPtr above = GetWindow(hwnd, GW_HWNDPREV);
+                if (above == IntPtr.Zero)
+                    return GetWindow(hwnd, GW_HWNDFIRST) == hwnd ? IntPtr.Zero : HWND_TOPMOST;
+                if (Shown(above))
+                    return above;
+                hwnd = above;
+            }
+            return HWND_TOPMOST;
+        }
+
+        /// <summary>WM_WINDOWPOSCHANGED: the window may have a new place in the z-order.</summary>
+        public static bool ZOrderChanged(IntPtr windowPos)
+        {
+            var pos = (WINDOWPOS)Marshal.PtrToStructure(windowPos, typeof(WINDOWPOS));
+            return (pos.flags & SWP_NOZORDER) == 0;
+        }
+
+        /// <summary>
+        /// Moves a topmost window directly below another topmost window, or with IntPtr.Zero to the very top.
+        /// Only this window moves (no owner or owned windows), and it is not activated.
+        /// </summary>
+        public static void PlaceBelow(IntPtr hwnd, IntPtr above)
+        {
+            const uint flags = SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER;
+            if (above == IntPtr.Zero || !IsTopmost(hwnd))
+                SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, flags);
+            if (above != IntPtr.Zero)
+                SetWindowPos(hwnd, above, 0, 0, 0, 0, flags);
         }
 
         /// <summary>
