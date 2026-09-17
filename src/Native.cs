@@ -261,11 +261,14 @@ namespace AiPets
             return (GetWindowLong(hwnd, GWL_EXSTYLE) & WS_EX_TOPMOST) != 0;
         }
 
-        /// <summary>Visible and not empty: helper windows without any area (input indicator) cover nothing.</summary>
+        /// <summary>
+        /// Visible and at least 2×2 px. Helper windows cover nothing: the input indicator has no area, and
+        /// Explorer's 1×1 ThumbnailDeviceHelperWnd sits in a higher z-band that no pet can get above anyway.
+        /// </summary>
         static bool Shown(IntPtr hwnd)
         {
             RECT r;
-            return IsWindowVisible(hwnd) && GetWindowRect(hwnd, out r) && r.Right > r.Left && r.Bottom > r.Top;
+            return IsWindowVisible(hwnd) && GetWindowRect(hwnd, out r) && r.Right - r.Left > 1 && r.Bottom - r.Top > 1;
         }
 
         /// <summary>
