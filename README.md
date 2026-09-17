@@ -9,6 +9,9 @@ Pixel-Art-Desktop-Pets für Windows, eins pro KI-Agent. Die Pets sitzen auf der 
 | **Astra** | Codex CLI im Windows Terminal | Codex-Desktop-App (unter Windows „ChatGPT“), chatgpt.com/codex | Codex-Hooks |
 | **Gemini** | gemini.google.com im Standardbrowser | Gemini CLI (`gemini`) | – |
 | **Grok** | grok.com im Standardbrowser | Grok CLI (`grok`) | – |
+| **Cursor** | Cursor-Desktop-App | Cursor im Terminal (`cursor`), cursor.com | – |
+
+**Cursor in zwei Optiken:** Unter **Einstellungen → Cursor → Aussehen** oder **Rechtsklick auf Cursor → Aussehen** wählst du **Pixel** (Standard, wie Grok) oder **Original** (fein aufgelöstes Entwurfsbild). Beide sind animiert: Atmen, wehende Haare, Blinzeln, Zwinkern beim Hover, eine kleine Fingerbewegung, Klickfreude und Schlafen. Der Wechsel wirkt sofort und behält Position, Höhe und Sichtbarkeit. Es bleibt ein einziges Pet. Cursor hat derzeit keine Agent-Status-Hooks.
 
 ## Schnellstart
 
@@ -22,7 +25,7 @@ Voraussetzung: Windows 10/11 mit .NET Framework 4.8. Windows Terminal ist option
 
    Mehrmals ausführen schadet nicht: Was schon stimmt, bleibt unverändert. Von jeder geänderten Datei liegt die vorige Fassung als `<datei>.bak-aipets` daneben. Agents, die gerade laufen, einmal neu starten, damit sie die Hooks laden.
 2. **Bedienen:** Im Infobereich der Taskleiste (bei den ausgeblendeten Symbolen hinter `^`) erscheint das aipets-Icon.
-   - **Linksklick:** Einstellungen. Dort kannst du Pets ein- und ausblenden, mit zwei Reglern die Größe wählen und unter **„Klick öffnet“** zwischen **Programm**, **Desktop-App** und **Website** umschalten. Die Desktop-App gibt es bei Claude, Hermes und Astra.
+   - **Linksklick:** Einstellungen. Dort kannst du Pets ein- und ausblenden, mit zwei Reglern die Größe wählen und unter **„Klick öffnet“** zwischen **Programm**, **Desktop-App** und **Website** umschalten. Die Desktop-App gibt es bei Claude, Hermes, Astra und Cursor.
      - **„Größe aller Pets“:** die Höhe aller Pets in Pixeln, von 162 px bis zur Bildschirmhöhe. Die Striche stehen bei 162, 324, 486 … px. Verschiebst du ihn, springen **alle** Pets auf diese Höhe, auch die mit eigener Größe, und sind dann gleich hoch.
      - **„Größe von <Pet>“:** eine eigene Höhe nur für dieses Pet, ebenfalls bis zur vollen Bildschirmhöhe. Sie bleibt, bis du den oberen Regler wieder bewegst. **„wie alle“** daneben setzt das Pet schon vorher auf die Höhe aller zurück.
      - Es wird nichts mehr malgenommen. Kleiner als 162 px geht nicht, größer als der Bildschirm auch nicht. Steht ein Pet auf einem niedrigeren Bildschirm, wird es dort passend kleiner.
@@ -45,7 +48,7 @@ Voraussetzung: Windows 10/11 mit .NET Framework 4.8. Windows Terminal ist option
 
 **Pet-Rechtsklick:** öffnen, Arbeitsordner (nur im Programm-Modus), „Klick öffnet“ → Programm / Desktop-App / Website, Größe (alle Pets auf 162 bis 648 px; nur dieses Pet: wie alle, kleiner, größer, so hoch wie der Bildschirm), zurück in die Ecke, ausblenden, Einstellungen, aipets beenden. Ein ausgeblendetes Pet bleibt aus, auch nach einem Neustart, bis du es in den Einstellungen oder im Tray-Menü wieder einschaltest.
 
-**Überlappende Pets** liegen in fester Reihenfolge übereinander: Wer in der Liste (Einstellungen, Tray-Menü) weiter oben steht, steht vorn, also Claude vor Hermes, Astra, Gemini und Grok. Die Reihenfolge kommt aus `order=` in `pets\<id>\pet.ini`. Menüs und Dialoge von aipets liegen immer über allen Pets. Schiebt sich ein anderes Programm mit „immer im Vordergrund“ davor, stehen die Pets nach spätestens gut drei Sekunden wieder darüber.
+**Überlappende Pets** liegen in fester Reihenfolge übereinander: Wer in der Liste (Einstellungen, Tray-Menü) weiter oben steht, steht vorn, also Claude vor Hermes, Astra, Gemini, Grok und Cursor. Die Reihenfolge kommt aus `order=` in `pets\<id>\pet.ini`. Menüs und Dialoge von aipets liegen immer über allen Pets. Schiebt sich ein anderes Programm mit „immer im Vordergrund“ davor, stehen die Pets nach spätestens gut drei Sekunden wieder darüber.
 
 Ein Klick startet Claude Code mit `--dangerously-skip-permissions`, Hermes mit `--yolo` und Codex mit `--dangerously-bypass-approvals-and-sandbox`. Gemini öffnet `https://gemini.google.com/app`, Grok `https://grok.com/`, beide im Standardbrowser. Das alles kannst du in den Einstellungen oder in `pets\<id>\pet.ini` ändern. Gemini CLI und Grok CLI sind nicht dabei; wer den Programm-Modus will, muss sie selbst installieren.
 

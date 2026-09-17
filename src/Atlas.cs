@@ -23,6 +23,9 @@ namespace AiPets
         /// <summary>Rows the character covers in the idle frame normal_0: her height in sprite pixels.</summary>
         public int FigureHeight { get; private set; }
 
+        // Hi-res artwork shares logical geometry with its pixel variant.
+        public int Density { get; private set; }
+
         readonly Bitmap sheet;
         readonly Dictionary<string, Point> frames = new Dictionary<string, Point>();
         readonly Dictionary<string, Rectangle> sprites = new Dictionary<string, Rectangle>();
@@ -42,6 +45,7 @@ namespace AiPets
 
         Atlas(Bitmap decoded, string manifest)
         {
+            Density = 1;
             sheet = new Bitmap(decoded.Width, decoded.Height, PixelFormat.Format32bppPArgb);
             using (var g = Graphics.FromImage(sheet))
             {
@@ -57,6 +61,11 @@ namespace AiPets
                 string[] p = raw.Trim().Split(' ');
                 switch (p[0])
                 {
+                    case "density":
+                        Density = Int(p[1]);
+                        if (Density < 1 || Density > 4)
+                            throw new InvalidDataException("Invalid atlas density.");
+                        break;
                     case "cell":
                         CellW = Int(p[1]);
                         CellH = Int(p[2]);
@@ -139,7 +148,13 @@ namespace AiPets
         public void DrawFrame(Graphics g, string name, Rectangle dest)
         {
             Point src = frames[name];
-            g.DrawImage(sheet, dest, src.X, src.Y, CellW, CellH, GraphicsUnit.Pixel, clampEdges);
+            InterpolationMode previous = g.InterpolationMode;
+            if (Density > 1) g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+            try
+            {
+                g.DrawImage(sheet, dest, src.X * Density, src.Y * Density, CellW * Density, CellH * Density, GraphicsUnit.Pixel, clampEdges);
+            }
+            finally { g.InterpolationMode = previous; }
         }
 
         /// <summary>Draws a sprite so that its pivot pixel lands on (x, y), zoom screen pixels per sprite pixel.</summary>
@@ -148,7 +163,7 @@ namespace AiPets
             Rectangle src = sprites[name];
             Point pivot = pivots[name];
             var dest = new Rectangle(x - Round(pivot.X * zoom), y - Round(pivot.Y * zoom), Round(src.Width * zoom), Round(src.Height * zoom));
-            g.DrawImage(sheet, dest, src.X, src.Y, src.Width, src.Height, GraphicsUnit.Pixel, clampEdges);
+            g.DrawImage(sheet, dest, src.X * Density, src.Y * Density, src.Width * Density, src.Height * Density, GraphicsUnit.Pixel, clampEdges);
         }
 
         static int Round(double value)
@@ -170,7 +185,7 @@ namespace AiPets
             var solid = new bool[CellW * CellH];
             for (int y = 0; y < CellH; y++)
                 for (int x = 0; x < CellW; x++)
-                    solid[y * CellW + x] = sheet.GetPixel(cell.X + x, cell.Y + y).A > 0;
+                    solid[y * CellW + x] = sheet.GetPixel((cell.X + x) * Density + Density / 2, (cell.Y + y) * Density + Density / 2).A > 0;
             return solid;
         }
 

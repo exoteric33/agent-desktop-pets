@@ -22,6 +22,17 @@ namespace AiPets
         public string Mode;         // "program", "app" or "website": what a click opens unless the settings say otherwise
         public string Status;       // "claude", "hermes", "codex" or "" — which hook source the pet shows
 
+        public bool HasOriginal
+        {
+            get { return File.Exists(Path.Combine(SpritesDir, "original", "atlas.png"))
+                && File.Exists(Path.Combine(SpritesDir, "original", "atlas.txt")); }
+        }
+
+        public string StyleDir(string style)
+        {
+            return style == "original" && HasOriginal ? Path.Combine(SpritesDir, "original") : SpritesDir;
+        }
+
         public string SpritesDir
         {
             get { return Path.Combine(Dir, "sprites"); }
@@ -109,7 +120,7 @@ namespace AiPets
         public int OwnHeight;       // this pet's own height ([id] height); 0 = the one of all pets
         public bool HasPosition;
         public int X, Y;            // bottom-centre of the pet in screen pixels
-        public string WorkDir, Program, Args, Shell, Url, DesktopApp, Mode;
+        public string WorkDir, Program, Args, Shell, Url, DesktopApp, Mode, Style;
 
         /// <summary>A click starts the program in the terminal.</summary>
         public bool OpensProgram
@@ -147,6 +158,7 @@ namespace AiPets
             s.Shell = ini.Get(id, "shell") ?? pet.Shell;
             s.Url = ini.Get(id, "url") ?? pet.Url;
             s.DesktopApp = ini.Get(id, "app") ?? pet.DesktopApp;
+            s.Style = ini.Get(id, "style") == "original" && pet.HasOriginal ? "original" : "pixel";
             s.UseMode(ini.Get(id, "mode") ?? pet.Mode);
             return s;
         }
