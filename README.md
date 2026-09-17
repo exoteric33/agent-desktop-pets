@@ -9,9 +9,9 @@ Pixel-Art-Desktop-Pets für Windows, eins pro KI-Agent. Die Pets sitzen auf der 
 | **Astra** | Codex CLI im Windows Terminal | Codex-Desktop-App (unter Windows „ChatGPT“), chatgpt.com/codex | Codex-Hooks |
 | **Gemini** | gemini.google.com im Standardbrowser | Gemini CLI (`gemini`) | – |
 | **Grok** | grok.com im Standardbrowser | Grok CLI (`grok`) | – |
-| **Cursor** | Cursor-Desktop-App | Cursor im Terminal (`cursor`), cursor.com | – |
+| **Cursor** | Cursor-Desktop-App | Cursor im Terminal (`cursor`), cursor.com | Cursor-Hooks |
 
-**Cursor in zwei Optiken:** Unter **Einstellungen → Cursor → Aussehen** oder **Rechtsklick auf Cursor → Aussehen** wählst du **Pixel** (Standard, wie Grok) oder **Original** (fein aufgelöstes Entwurfsbild). Beide sind animiert: Atmen, wehende Haare, Blinzeln, Zwinkern beim Hover, eine kleine Fingerbewegung, Klickfreude und Schlafen. Der Wechsel wirkt sofort und behält Position, Höhe und Sichtbarkeit. Es bleibt ein einziges Pet. Cursor hat derzeit keine Agent-Status-Hooks.
+**Cursor in zwei Optiken:** Unter **Einstellungen → Cursor → Aussehen** oder **Rechtsklick auf Cursor → Aussehen** wählst du **Pixel** (Standard, wie Grok) oder **Original** (fein aufgelöstes Entwurfsbild). Beide sind animiert: Atmen, wehende Haare, Blinzeln, Zwinkern beim Hover, eine kleine Fingerbewegung, Klickfreude und Schlafen. Der Wechsel wirkt sofort und behält Position, Höhe und Sichtbarkeit. Es bleibt ein einziges Pet. Den Status bekommt Cursor über Cursors Hooks (siehe unten); ein „?“ für „wartet auf dich“ gibt es bei Cursor nicht, weil Cursor dafür kein Ereignis meldet.
 
 ## Schnellstart
 
@@ -20,7 +20,7 @@ Voraussetzung: Windows 10/11 mit .NET Framework 4.8. Windows Terminal ist option
 1. **Installieren:** Den Ordner dorthin legen, wo er bleiben soll (klonen oder ZIP entpacken), und **`install.cmd` doppelklicken.** Autostart und Hooks merken sich den Pfad.
    - Im Quellcode-Ordner wird `aipets.exe` mit dem C#-Compiler aus Windows gebaut. Das Release-ZIP enthält die fertige exe und überspringt den Build.
    - Schaltet „Mit Windows starten“ ein.
-   - Trägt die Status-Hooks für Claude Code, Codex und Hermes Agent ein, soweit sie installiert sind, und richtet die Freigaben ein. Für die automatische Codex-Freigabe muss die Codex CLI vorhanden sein; andernfalls zeigt die Zusammenfassung die nötigen Schritte unter `/hooks`.
+   - Trägt die Status-Hooks für Claude Code, Codex, Hermes Agent und Cursor ein, soweit sie installiert sind, und richtet die Freigaben ein. Für die automatische Codex-Freigabe muss die Codex CLI vorhanden sein; andernfalls zeigt die Zusammenfassung die nötigen Schritte unter `/hooks`.
    - Startet aipets und zeigt am Ende, was es gemacht hat.
 
    Mehrmals ausführen schadet nicht: Was schon stimmt, bleibt unverändert. Von jeder geänderten Datei liegt die vorige Fassung als `<datei>.bak-aipets` daneben. Agents, die gerade laufen, einmal neu starten, damit sie die Hooks laden.
@@ -117,6 +117,23 @@ In `%USERPROFILE%\.codex\hooks.json` eintragen (bzw. `%CODEX_HOME%\hooks.json`) 
 
 Codex führt neue Hooks erst aus, wenn du sie freigegeben hast: In Codex `/hooks` öffnen und die sechs aipets-Hooks als vertrauenswürdig markieren. Änderst du einen Befehl (z. B. weil die exe woanders liegt), fragt Codex erneut.
 
+### Cursor
+
+In `%USERPROFILE%\.cursor\hooks.json` eintragen und den Pfad anpassen. Cursor startet Hook-Befehle unter Windows über PowerShell und gibt das Ereignis in den Daten mit, die der Hook bekommt. Deshalb steht hier nur der Pfad, ohne Argumente. Enthält er Leerzeichen, kommt er in einfache Anführungszeichen, etwa `"command": "'C:\\Program Files\\aipets\\aipets.exe'"`.
+
+```json
+{
+  "version": 1,
+  "hooks": {
+    "beforeSubmitPrompt": [{ "command": "C:\\Pfad\\zu\\aipets.exe", "timeout": 10 }],
+    "stop":               [{ "command": "C:\\Pfad\\zu\\aipets.exe", "timeout": 10 }],
+    "sessionEnd":         [{ "command": "C:\\Pfad\\zu\\aipets.exe", "timeout": 10 }]
+  }
+}
+```
+
+Cursor übernimmt außerdem von sich aus die Hooks aus Claude Code (Cursor-Einstellung „Include Third-Party Plugins, Skills, and Other Configs“), allerdings ohne deren Argumente. aipets erkennt diese Aufrufe und zeigt sie bei Cursor an, statt sich selbst zu öffnen. Steht in beiden Dateien derselbe Befehl, führt Cursor ihn nur einmal aus. Jeder Hook startet unter Windows eine PowerShell und kostet etwa eine halbe Sekunde, auf die Cursor wartet. aipets trägt für Cursor deshalb keinen Hook nach jedem Tool-Aufruf ein; der übernommene `PostToolUse`-Hook aus Claude Code läuft aber mit, solange die Übernahme in Cursor an ist. Welche Hooks Cursor ausführt, steht in Cursor im Ausgabekanal „Hooks“.
+
 ## Selbst bauen
 
 ```powershell
@@ -129,10 +146,11 @@ Codex führt neue Hooks erst aus, wenn du sie freigegeben hast: In Codex `/hooks
 ## Bekannte Grenzen
 
 - Gemini und Grok zeigen im Website-Modus keinen Arbeitsstatus.
+- Cursor meldet nicht, wann es auf deine Bestätigung wartet: Das „?“ fehlt bei Cursor. Die Cursor-Hooks folgen der öffentlichen Doku und dem Verhalten von Cursor 3.5 und sind noch nicht in einer echten Cursor-Sitzung erprobt.
 - Bei abgebrochenen Codex-Turns ohne Abschluss-Hook kann der Spinner bis zum Timeout von 15 Minuten bleiben.
 - Die Status-Hooks der Claude-Desktop-App und Hermes Desktop sowie das Verhalten auf mehreren Monitoren müssen noch manuell geprüft werden.
 - Der YAML-Editor unterstützt eingerückte Hook-Listen, leere Blöcke und Kommentare. Kompakte nichtleere Inline-Hook-Listen oder doppelte Hook-Schlüssel werden mit einer Fehlermeldung abgelehnt; die Datei bleibt erhalten.
 
 ## Lizenz
 
-Der Quellcode steht unter der [MIT-Lizenz](LICENSE). Die Pet-Grafiken in `pets/*/sprites/` sowie Namen und Logos von Anthropic, OpenAI, Google, xAI und Nous Research fallen nicht darunter. aipets ist ein inoffizielles Fan-Projekt und steht in keiner Verbindung zu diesen Anbietern.
+Der Quellcode steht unter der [MIT-Lizenz](LICENSE). Die Pet-Grafiken in `pets/*/sprites/` sowie Namen und Logos von Anthropic, OpenAI, Google, xAI, Nous Research und Anysphere (Cursor) fallen nicht darunter. aipets ist ein inoffizielles Fan-Projekt und steht in keiner Verbindung zu diesen Anbietern.

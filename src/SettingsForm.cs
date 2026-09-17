@@ -773,6 +773,12 @@ namespace AiPets
                 file = Path.Combine(Setup.CodexHome, "hooks.json");
                 marker = App.ExePath.Replace("'", "''").Replace("\\", "\\\\");
             }
+            else if (pet.Status == "cursor")
+            {
+                file = Path.Combine(Setup.CursorHome, "hooks.json");
+                string quoted = Json.Quote(Setup.CursorCommand(App.ExePath));
+                marker = quoted.Substring(1, quoted.Length - 2);   // the command as JSON writes it
+            }
             else
             {
                 return "–";
@@ -783,7 +789,9 @@ namespace AiPets
                 if (File.Exists(file))
                 {
                     string text = File.ReadAllText(file);
-                    bool hooked = text.IndexOf("--hook", StringComparison.Ordinal) >= 0 && text.IndexOf("aipets", StringComparison.OrdinalIgnoreCase) >= 0;
+                    // Cursor's hooks carry no arguments (the event comes with the payload)
+                    bool hooked = (pet.Status == "cursor" ? text.IndexOf("aipets.exe", StringComparison.OrdinalIgnoreCase) >= 0 : text.IndexOf("--hook", StringComparison.Ordinal) >= 0)
+                        && text.IndexOf("aipets", StringComparison.OrdinalIgnoreCase) >= 0;
                     ok = hooked && text.IndexOf(marker, StringComparison.OrdinalIgnoreCase) >= 0;
                     other = hooked && !ok;
                 }

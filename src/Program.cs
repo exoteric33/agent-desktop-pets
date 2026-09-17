@@ -14,6 +14,8 @@ namespace AiPets
     /// aipets.exe                          tray (starts and watches the pets)
     /// aipets.exe --pet &lt;id&gt; [--host pid]   one pet window
     /// aipets.exe --hook &lt;source&gt; &lt;event&gt;  agent hook: record the state and exit
+    /// aipets.exe --hook cursor            Cursor hook, the event comes with the payload
+    /// aipets.exe (started by Cursor)      also a Cursor hook: CURSOR_VERSION is set and the payload is piped in
     /// aipets.exe --snapshot &lt;dir&gt; [--pet id]  render pets, all pets side by side and the settings window (that pet's page, once per mode) into PNGs
     /// aipets.exe --status &lt;source&gt;        print the folded agent state (diagnostics)
     /// aipets.exe --command &lt;id&gt; [--mode m] print what a click on the pet would start (diagnostics; m = program, app, website)
@@ -29,11 +31,14 @@ namespace AiPets
         static int Main(string[] args)
         {
             // agent hook: kept out of Run so this path never loads WinForms and exits within milliseconds
-            if (args.Length >= 3 && args[0] == "--hook")
+            if (args.Length > 0 && args[0] == "--hook" && (args.Length >= 3 || (args.Length == 2 && args[1] == "cursor")))
             {
-                HookCommand.Run(args[1], args[2]);
+                HookCommand.Run(args[1], args.Length >= 3 ? args[2] : null);
                 return 0;
             }
+            // Cursor runs its hooks and Claude Code's without arguments: never start the tray (or open its settings) for them
+            if (args.Length == 0 && HookCommand.RunCursorHook())
+                return 0;
             return Run(args);
         }
 
@@ -152,7 +157,7 @@ namespace AiPets
         {
             Log.Tag = install ? "install" : "uninstall";
             if (!install && !quiet && MessageBox.Show(
-                    "aipets entfernen?\n\nDas beendet aipets und entfernt „Mit Windows starten“ sowie die Status-Hooks aus Claude Code, Codex und Hermes.",
+                    "aipets entfernen?\n\nDas beendet aipets und entfernt „Mit Windows starten“ sowie die Status-Hooks aus Claude Code, Codex, Hermes und Cursor.",
                     App.Name, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
                 return 1;
             if (!install)

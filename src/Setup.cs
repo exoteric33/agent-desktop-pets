@@ -11,7 +11,7 @@ namespace AiPets
 {
     /// <summary>
     /// aipets.exe --install / --uninstall and "Hooks einrichten" in the settings window: autostart plus the
-    /// status hooks of every installed agent (Claude Code, Codex, Hermes Agent), all pointing at this exe.
+    /// status hooks of every installed agent (Claude Code, Codex, Hermes Agent, Cursor), all pointing at this exe.
     /// Only aipets' own entries are touched, a file is only written when something changes, and the old
     /// version is kept as &lt;file&gt;.bak-aipets.
     /// </summary>
@@ -54,6 +54,11 @@ namespace AiPets
             }
         }
 
+        public static string CursorHome
+        {
+            get { return Path.Combine(UserProfile, ".cursor"); }
+        }
+
         public static string HermesHome
         {
             get
@@ -78,7 +83,7 @@ namespace AiPets
             {
                 steps.Add(new Step("Mit Windows starten", false, ex.Message));
             }
-            foreach (string source in new[] { "claude", "codex", "hermes" })
+            foreach (string source in new[] { "claude", "codex", "hermes", "cursor" })
                 steps.Add(Hooks(source, exe, true));
             return steps;
         }
@@ -95,7 +100,7 @@ namespace AiPets
             {
                 steps.Add(new Step("Mit Windows starten", false, ex.Message));
             }
-            foreach (string source in new[] { "claude", "codex", "hermes" })
+            foreach (string source in new[] { "claude", "codex", "hermes", "cursor" })
                 steps.Add(Hooks(source, exe, false));
             return steps;
         }
@@ -110,13 +115,15 @@ namespace AiPets
                     case "claude": return Claude(ClaudeSettings, exe, install);
                     case "codex": return Codex(CodexHome, exe, install, true);
                     case "hermes": return Hermes(HermesHome, exe, install);
+                    case "cursor": return Cursor(CursorHome, exe, install);
                 }
                 return new Step(source, false, "für diese Statusquelle gibt es keine Hooks");
             }
             catch (Exception ex)
             {
                 Log.Write("setup " + source + ": " + ex);
-                return new Step(source == "claude" ? "Claude Code" : source == "codex" ? "Codex" : "Hermes Agent", false, "Fehler: " + ex.Message);
+                string name = source == "claude" ? "Claude Code" : source == "codex" ? "Codex" : source == "cursor" ? "Cursor" : "Hermes Agent";
+                return new Step(name, false, "Fehler: " + ex.Message);
             }
         }
 
@@ -436,6 +443,120 @@ namespace AiPets
             {
                 var groups = hooks.Get(ev) as List<object>;
                 if (groups != null && groups.Count == 0)
+                    hooks.Remove(ev);
+            }
+            if (hooks.Items.Count == 0)
+                root.Remove("hooks");
+
+            string after = Json.Write(root);
+            if (after == before)
+                return false;
+            Save(path, original, after);
+            return true;
+        }
+
+        // ------------------------------------------------------------------ Cursor
+
+        // Cursor names the event in the payload (hook_event_name); aipets reads it there (HookCommand.Cursor).
+        // No postToolUse: Cursor waits for every hook, and each one starts Windows PowerShell (about half a second).
+        static readonly string[] CursorEvents = { "beforeSubmitPrompt", "stop", "sessionEnd" };
+
+        /// <summary>
+        /// The command of aipets' Cursor hooks: the bare exe path, exactly the "command" of aipets' Claude Code hooks.
+        /// Cursor also runs Claude Code's hooks (without their args) but drops those that equal one of its own.
+        /// Cursor runs hooks through Windows PowerShell: a path PowerShell would split gets single quotes, and
+        /// Cursor then puts the call operator in front.
+        /// </summary>
+        public static string CursorCommand(string exe)
+        {
+            return Regex.IsMatch(exe, @"^[\p{L}\p{Nd}_.:\\-]+$") ? exe : "'" + exe.Replace("'", "''") + "'";
+        }
+
+        public static Step Cursor(string home, string exe, bool install)
+        {
+            const string name = "Cursor";
+            if (!Directory.Exists(home))
+                return new Step(name, !install, "nicht installiert");
+            string path = Path.Combine(home, "hooks.json");
+            bool changed = EditCursorHooks(path, install ? CursorCommand(exe) : null);
+            return new Step(name, true, Outcome(changed, install) + " (" + PetForm.ShortPath(path) + ")");
+        }
+
+        static bool IsOursInCursor(object item)
+        {
+            var hook = item as JsonObject;
+            string command = hook != null ? Json.Text(hook.Get("command")) : null;
+            return command != null && command.IndexOf("aipets.exe", StringComparison.OrdinalIgnoreCase) >= 0
+                && (command.IndexOf("--hook", StringComparison.Ordinal) < 0 || command.IndexOf("--hook cursor", StringComparison.Ordinal) >= 0);
+        }
+
+        /// <summary>
+        /// Cursor's hooks.json: { "version": 1, "hooks": { event: [ { "command": …, "timeout": … } ] } }. Removes aipets'
+        /// entries and, with a command, adds one per event where the old ones were. True if the file changed.
+        /// </summary>
+        public static bool EditCursorHooks(string path, string command)
+        {
+            string original = File.Exists(path) ? File.ReadAllText(path) : "";
+            bool empty = original.Trim().Length == 0;
+            if (empty && command == null)
+                return false;
+            var root = (empty ? new JsonObject() : Json.Parse(original)) as JsonObject;
+            if (root == null)
+                throw new FormatException(Path.GetFileName(path) + " enthält kein JSON-Objekt");
+            string before = empty ? "" : Json.Write(Json.Parse(original));
+            if (command != null && root.Get("version") == null)
+                root.Set("version", JsonValue.Of(1));
+
+            var hooks = root.Get("hooks") as JsonObject;
+            if (hooks == null)
+            {
+                if (root.Get("hooks") != null)
+                    throw new FormatException("hooks muss ein JSON-Objekt sein");
+                if (command == null)
+                    return false;
+                hooks = new JsonObject();
+                root.Set("hooks", hooks);
+            }
+            var slots = new Dictionary<string, int>();   // event -> index of aipets' old entry
+            foreach (KeyValuePair<string, object> ev in hooks.Items)
+            {
+                var entries = ev.Value as List<object>;
+                if (entries == null)
+                    continue;
+                for (int i = entries.Count - 1; i >= 0; i--)
+                {
+                    if (!IsOursInCursor(entries[i]))
+                        continue;
+                    entries.RemoveAt(i);
+                    slots[ev.Key] = i;
+                }
+            }
+            if (command != null)
+            {
+                foreach (string ev in CursorEvents)
+                {
+                    var entries = hooks.Get(ev) as List<object>;
+                    if (entries == null)
+                    {
+                        if (hooks.Get(ev) != null)
+                            throw new FormatException(ev + " muss eine JSON-Liste sein");
+                        entries = new List<object>();
+                        hooks.Set(ev, entries);
+                    }
+                    var hook = new JsonObject();
+                    hook.Set("command", JsonValue.Of(command));
+                    hook.Set("timeout", JsonValue.Of(10));
+                    int slot;
+                    if (slots.TryGetValue(ev, out slot) && slot <= entries.Count)
+                        entries.Insert(slot, hook);
+                    else
+                        entries.Add(hook);
+                }
+            }
+            foreach (string ev in slots.Keys)
+            {
+                var entries = hooks.Get(ev) as List<object>;
+                if (entries != null && entries.Count == 0)
                     hooks.Remove(ev);
             }
             if (hooks.Items.Count == 0)

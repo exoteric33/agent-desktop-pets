@@ -95,15 +95,20 @@ namespace AiPets
             Log.Tag = "hook " + source;
             try
             {
+                if (source == "cursor")
+                {
+                    int pid = CursorPid();   // first: PowerShell, the hook's parent, may be gone soon
+                    string payload = ReadStdin();
+                    Cursor(what ?? CursorStep(payload), payload, pid);
+                    return;
+                }
                 // always drain stdin: the agent may still be writing and would see a broken pipe
-                string input;
-                using (var stdin = new StreamReader(Console.OpenStandardInput(), new UTF8Encoding(false)))
-                    input = stdin.ReadToEnd();
+                string input = ReadStdin();
                 switch (source)
                 {
                     case "claude":
                     case "codex":
-                        Session(source, what, input);
+                        Session(source, what, input, ProcessInfo.FindAncestor(source, 6));   // claude.exe / codex.exe
                         break;
                     case "hermes":
                         Hermes(what, input);
@@ -119,16 +124,115 @@ namespace AiPets
             }
         }
 
+        static string ReadStdin()
+        {
+            using (var stdin = new StreamReader(Console.OpenStandardInput(), new UTF8Encoding(false)))
+                return stdin.ReadToEnd();
+        }
+
         /// <summary>
-        /// Claude Code and Codex, one file per session_id.
+        /// Cursor starts aipets.exe without arguments: aipets' own Cursor hooks look like that (Setup.CursorCommand),
+        /// and Cursor also runs Claude Code's hooks but drops their "args". Cursor names the event in the payload.
+        /// True if this process was such a hook and has done its work; false for a normal start.
+        /// </summary>
+        public static bool RunCursorHook()
+        {
+            // Cursor sets CURSOR_VERSION only for hooks and always pipes the payload in
+            if (Environment.GetEnvironmentVariable("CURSOR_VERSION") == null || !Console.IsInputRedirected)
+                return false;
+            int pid = CursorPid();
+            // never hang on a stdin that is not closed: the payload comes at once
+            string payload = null;
+            var reader = new Thread(delegate() { try { payload = ReadStdin(); } catch (IOException) { } });
+            reader.IsBackground = true;
+            reader.Start();
+            if (!reader.Join(5000) || payload == null || !payload.TrimStart().StartsWith("{", StringComparison.Ordinal))
+                return false;
+            Log.Tag = "hook cursor";
+            try
+            {
+                Cursor(CursorStep(payload), payload, pid);
+            }
+            catch (Exception ex)
+            {
+                Log.Write("cursor: " + ex.Message);
+            }
+            return true;   // a payload from Cursor, even for an event aipets does not use: never start the tray from a hook
+        }
+
+        /// <summary>The Cursor event of a hook payload (hook_event_name), or null.</summary>
+        public static string CursorStep(string payload)
+        {
+            try
+            {
+                var root = Json.Parse(payload) as JsonObject;
+                return root != null ? Json.Text(root.Get("hook_event_name")) : null;
+            }
+            catch (FormatException)
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// The Cursor window that ran the hook: Cursor's main process sets VSCODE_PID, which every hook inherits.
+        /// Otherwise the nearest Cursor.exe above the hook, or 0.
+        /// </summary>
+        static int CursorPid()
+        {
+            int pid;
+            string main = Environment.GetEnvironmentVariable("VSCODE_PID");
+            if (int.TryParse(main, NumberStyles.Integer, CultureInfo.InvariantCulture, out pid) && ProcessInfo.IsImage(pid, "cursor"))
+                return pid;
+            return ProcessInfo.FindAncestor("cursor", 6);
+        }
+
+        /// <summary>
+        /// Cursor, one file per conversation: beforeSubmitPrompt → working, stop → done if completed (aborted or
+        /// failed turns end quietly), sessionEnd → end. postToolUse (from Claude Code's imported hooks) refreshes a
+        /// working turn. Cursor has no event for "waits for your approval". Other events change nothing.
+        /// </summary>
+        public static void Cursor(string step, string payload, int pid)
+        {
+            string what;
+            switch (step)
+            {
+                case "beforeSubmitPrompt":
+                    what = "working";
+                    break;
+                case "postToolUse":
+                    what = "resume";
+                    break;
+                case "stop":
+                    string status = null;
+                    try
+                    {
+                        var root = Json.Parse(payload) as JsonObject;
+                        status = root != null ? Json.Text(root.Get("status")) : null;
+                    }
+                    catch (FormatException) { }
+                    what = status == "completed" ? "done" : "idle";
+                    break;
+                case "sessionEnd":
+                    what = "end";
+                    break;
+                default:
+                    return;
+            }
+            Session("cursor", what, payload, pid);
+        }
+
+        /// <summary>
+        /// Claude Code and Codex, one file per session_id; Cursor, one per conversation_id (see Cursor).
         /// Claude Code: UserPromptSubmit → working, PostToolUse → resume, Notification → waiting,
         /// Stop → done, SessionEnd → end.
         /// Codex: UserPromptSubmit → working, PostToolUse → resume, PermissionRequest → waiting,
         /// Stop → done, Interrupt → idle, SessionEnd → end.
+        /// pid: the agent process; the pet drops the file once it is gone.
         /// </summary>
-        static void Session(string source, string what, string input)
+        static void Session(string source, string what, string input, int pid)
         {
-            string id = JsonString(input, "session_id");
+            string id = source == "cursor" ? JsonString(input, "conversation_id") ?? JsonString(input, "session_id") : JsonString(input, "session_id");
             if (string.IsNullOrEmpty(id) || id.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
                 return;
             string path = Path.Combine(StatusEntry.Folder(source), id + ".txt");
@@ -164,10 +268,10 @@ namespace AiPets
                         case "idle": state = AgentState.Idle; break;   // Codex: Esc interrupted the turn
                         case "resume":
                             // a tool finished: ends a permission wait, but must not revive a finished
-                            // turn (background agents keep running tools after Stop). Codex also
-                            // refreshes a working turn: its hooks are the only sign of activity
+                            // turn (background agents keep running tools after Stop). Codex and Cursor
+                            // also refresh a working turn: their hooks are the only sign of activity
                             if (current != null && current.State != AgentState.Waiting
-                                && !(source == "codex" && current.State == AgentState.Working))
+                                && !(source != "claude" && current.State == AgentState.Working))
                                 return;
                             state = AgentState.Working;
                             break;
@@ -178,7 +282,7 @@ namespace AiPets
                     {
                         State = state,
                         Time = time,
-                        Pid = ProcessInfo.FindAncestor(source, 6),   // claude.exe / codex.exe
+                        Pid = pid,
                         Extra = JsonString(input, "transcript_path") ?? "",
                     }.Write(path);
                 }
@@ -319,7 +423,7 @@ namespace AiPets
         const int TailBytes = 16 * 1024;
 
         readonly string folder;
-        readonly bool claudeTranscripts, codex;
+        readonly bool claudeTranscripts, codex, transcripts;
         readonly long staleMs;
         readonly Dictionary<string, long> checkedTranscripts = new Dictionary<string, long>();
 
@@ -331,8 +435,9 @@ namespace AiPets
             folder = StatusEntry.Folder(source);
             claudeTranscripts = source == "claude";
             codex = source == "codex";
-            // Claude's transcript and Codex's tool hooks show activity, so a quiet session is stale
-            // soon; Hermes always reports the end of a turn, the timeout only catches lost hooks
+            transcripts = claudeTranscripts || codex || source == "cursor";   // Extra holds the transcript path
+            // Claude's transcript and Codex's tool hooks show activity, so a quiet session is stale soon;
+            // Hermes and Cursor always report the end of a turn, the timeout only catches lost hooks
             staleMs = claudeTranscripts || codex ? 15 * 60 * 1000L : 2 * 3600 * 1000L;
         }
 
@@ -362,7 +467,7 @@ namespace AiPets
                 }
                 if (s.State == AgentState.Working || s.State == AgentState.Waiting)
                 {
-                    long activity = claudeTranscripts || codex ? Math.Max(s.Time, TranscriptTime(s.Extra)) : s.Time;
+                    long activity = transcripts ? Math.Max(s.Time, TranscriptTime(s.Extra)) : s.Time;
                     if ((claudeTranscripts && Interrupted(s)) || now - activity > staleMs)
                     {
                         // Esc in Claude Code does not fire Stop, a failed Codex turn neither; don't spin forever
@@ -467,10 +572,7 @@ namespace AiPets
                     return 0;
                 try
                 {
-                    var name = new StringBuilder(1024);
-                    int size = name.Capacity;
-                    if (QueryFullProcessImageName(h, 0, name, ref size)
-                        && string.Equals(Path.GetFileNameWithoutExtension(name.ToString()), imageName, StringComparison.OrdinalIgnoreCase))
+                    if (HasImage(h, imageName))
                         return pid;
                     pid = ParentPid(h);
                 }
@@ -480,6 +582,33 @@ namespace AiPets
                 }
             }
             return 0;
+        }
+
+        /// <summary>The process runs and its exe has this name (without .exe).</summary>
+        public static bool IsImage(int pid, string imageName)
+        {
+            if (pid <= 0)
+                return false;
+            IntPtr h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
+            if (h == IntPtr.Zero)
+                return false;
+            try
+            {
+                int code;
+                return GetExitCodeProcess(h, out code) && code == STILL_ACTIVE && HasImage(h, imageName);
+            }
+            finally
+            {
+                CloseHandle(h);
+            }
+        }
+
+        static bool HasImage(IntPtr process, string imageName)
+        {
+            var name = new StringBuilder(1024);
+            int size = name.Capacity;
+            return QueryFullProcessImageName(process, 0, name, ref size)
+                && string.Equals(Path.GetFileNameWithoutExtension(name.ToString()), imageName, StringComparison.OrdinalIgnoreCase);
         }
 
         public static bool IsAlive(int pid)
