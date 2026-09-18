@@ -1,5 +1,7 @@
 # aipets
 
+*Agent desktop pets for Windows — pixel-art desktop pets, one per AI agent: Claude Code, Codex, Cursor, Copilot, Gemini, Grok, Hermes. Documentation in German.*
+
 Pixel-Art-Desktop-Pets für Windows, eins pro KI-Agent. Die Pets sitzen auf der Taskleiste. Ein Klick öffnet ihren Agenten im Terminal, als Desktop-App oder seine Website im Browser, und sie zeigen an, ob er gerade arbeitet, auf dich wartet oder fertig ist.
 
 | Pet | Klick öffnet (Standard) | Umschaltbar auf | Status kommt von |
