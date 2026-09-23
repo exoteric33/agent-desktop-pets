@@ -115,12 +115,19 @@ namespace AiPets
         // old settings counted sizes in steps of this (1×, 2× …)
         public const int HeightUnit = 162, MinHeight = HeightUnit;
 
-        public bool Enabled;
+        public bool Enabled;        // the pet's own choice ([id] enabled)
+        public bool AllHidden;      // "Alle Pets ausblenden" ([app] hidden=1); Enabled stays as it was
         public int Height;          // height of all pets in screen pixels ([app] height); 0 = from the display DPI
         public int OwnHeight;       // this pet's own height ([id] height); 0 = the one of all pets
         public bool HasPosition;
         public int X, Y;            // bottom-centre of the pet in screen pixels
         public string WorkDir, Program, Args, Shell, Url, DesktopApp, Mode, Style;
+
+        /// <summary>The pet is on the desktop: shown herself, and not all pets hidden.</summary>
+        public bool Shown
+        {
+            get { return Enabled && !AllHidden; }
+        }
 
         /// <summary>A click starts the program in the terminal.</summary>
         public bool OpensProgram
@@ -145,6 +152,7 @@ namespace AiPets
             string id = pet.Id;
             var s = new PetSettings();
             s.Enabled = ini.Get(id, "enabled") != "0";
+            s.AllHidden = HidesAll(ini);
             s.Height = HeightOf(ini, "app");
             s.OwnHeight = HeightOf(ini, id);
             s.HasPosition = ini.Get(id, "x") != null && ini.Get(id, "y") != null;
@@ -161,6 +169,12 @@ namespace AiPets
             s.Style = ini.Get(id, "style") == "original" && pet.HasOriginal ? "original" : "pixel";
             s.UseMode(ini.Get(id, "mode") ?? pet.Mode);
             return s;
+        }
+
+        /// <summary>All pets are hidden at once; each pet's own "Anzeigen" comes back when this is off again.</summary>
+        public static bool HidesAll(Ini ini)
+        {
+            return ini.Get("app", "hidden") == "1";
         }
 
         /// <summary>Switches the mode; app mode needs an app to look for, otherwise it is program mode.</summary>

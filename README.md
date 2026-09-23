@@ -42,7 +42,8 @@ Voraussetzung: Windows 10/11 mit .NET Framework 4.8. Windows Terminal ist option
        - Hermes Desktop muss einmal gebaut werden. Solange sie fehlt, startet ein Klick `hermes desktop` im Terminal. Das baut die App (beim ersten Mal einige Minuten) und öffnet sie, danach startet sie direkt.
      - Website: der Link (nur http/https; `grok.com` wird automatisch zu `https://grok.com/`).
      - Unten: „Mit Windows starten“. Das ist von Anfang an an: aipets schaltet es beim Start selbst ein, auch nach dem Verschieben des Ordners. Schaltest du es aus, bleibt es aus.
-   - **Rechtsklick:** Menü mit allen Pets, Autostart und Beenden.
+     - Unten: **„Alle Pets ausblenden“** blendet alle Pets auf einmal aus, zum Beispiel beim Bildschirmteilen. Schaltest du es wieder aus, kommen genau die Pets zurück, die vorher zu sehen waren; einzeln ausgeblendete bleiben aus. Solange es an ist, ist „Anzeigen“ der einzelnen Pets ausgegraut. Es bleibt auch nach einem Neustart an.
+   - **Rechtsklick:** Menü mit allen Pets, „Alle Pets ausblenden“, Autostart und Beenden.
 3. **Entfernen:** **`uninstall.cmd` doppelklicken.** Es beendet aipets, schaltet „Mit Windows starten“ aus und nimmt die Hooks wieder heraus. Danach kannst du den Ordner löschen, und `%APPDATA%\aipets` (Einstellungen, Log) auch.
 
 **Ordner verschoben oder einen Agent erst später installiert?** Die Einstellungen zeigen unter „Statusanzeige“, ob die Hooks zu dieser `aipets.exe` passen. Wenn nicht, trägt der Link **„Hooks einrichten“** darunter sie mit einem Klick neu ein. Nach dem Verschieben erledigt `install.cmd` im neuen Ordner alles auf einmal, auch den Autostart.

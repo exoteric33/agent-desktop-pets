@@ -208,7 +208,7 @@ namespace AiPets
             long now = clock.ElapsedMilliseconds;
             foreach (PetProcess p in Pets)
             {
-                bool wanted = iniRead && !quitting && p.Info.HasSprites && SettingsOf(p).Enabled;
+                bool wanted = iniRead && !quitting && p.Info.HasSprites && SettingsOf(p).Shown;
                 if (p.Proc != null && p.Proc.HasExited)
                     Exited(p, now, wanted);
                 if (p.Proc == null)
@@ -303,6 +303,8 @@ namespace AiPets
                 return "Sprites fehlen";
             if (!SettingsOf(p).Enabled)
                 return "ausgeblendet";
+            if (AllHidden)
+                return "alle ausgeblendet";
             if (p.Running)
                 return p.Stopping ? "wird beendet …" : p.Failures > 0 ? "läuft wieder" : "läuft";
             if (p.Failures > 0)
@@ -318,6 +320,25 @@ namespace AiPets
             p.Failures = 0;
             p.RetryAt = 0;
             p.Problem = null;
+            ReloadIni();
+            Supervise();
+        }
+
+        public bool AllHidden
+        {
+            get { return PetSettings.HidesAll(ini); }
+        }
+
+        /// <summary>Hides all pets or brings back the ones that were shown; each pet's own "Anzeigen" stays untouched.</summary>
+        public void SetAllHidden(bool hidden)
+        {
+            Store.Update("app", "hidden", hidden ? "1" : null);
+            foreach (PetProcess p in Pets)
+            {
+                p.Failures = 0;
+                p.RetryAt = 0;
+                p.Problem = null;
+            }
             ReloadIni();
             Supervise();
         }
@@ -452,25 +473,32 @@ namespace AiPets
             prefs.Font = new Font(prefs.Font, FontStyle.Bold);
             menu.Items.Add(prefs);
             menu.Items.Add(new ToolStripSeparator());
+            bool allHidden = AllHidden;
             foreach (PetProcess pet in Pets)
             {
                 PetProcess p = pet;
-                bool enabled = SettingsOf(p).Enabled;
+                PetSettings s = SettingsOf(p);
                 var item = new ToolStripMenuItem(p.Info.Name, PetImage(p.Info, 16));
                 var show = new ToolStripMenuItem("Anzeigen", null, delegate { SetEnabled(p, !SettingsOf(p).Enabled); });
-                show.Checked = enabled;
+                show.Checked = s.Enabled;
+                show.Enabled = !allHidden;   // her own choice waits until all pets are shown again
                 var home = new ToolStripMenuItem("Zurück in die Ecke", null, delegate { SendHome(p); });
-                home.Enabled = enabled;
+                home.Enabled = s.Shown;
                 item.DropDownItems.AddRange(new ToolStripItem[]
                 {
                     show, new ToolStripMenuItem(p.Info.OpenText, null, delegate { Launch(p); }), home,
                 });
-                if (!enabled)
+                if (!s.Shown)
                     item.ForeColor = SystemColors.GrayText;
                 menu.Items.Add(item);
             }
             if (Pets.Count > 0)
+            {
                 menu.Items.Add(new ToolStripSeparator());
+                var hideAll = new ToolStripMenuItem("Alle Pets ausblenden", null, delegate { SetAllHidden(!AllHidden); });
+                hideAll.Checked = allHidden;
+                menu.Items.Add(hideAll);
+            }
             var autostart = new ToolStripMenuItem("Mit Windows starten", null, delegate
             {
                 try { Autostart.Choose(!Autostart.Enabled); }

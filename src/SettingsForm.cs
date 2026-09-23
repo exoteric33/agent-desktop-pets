@@ -28,7 +28,7 @@ namespace AiPets
         readonly Label title = new Label(), state = new Label(), hooks = new Label();
         readonly Label appName = new Label(), appWhere = new Label();
         readonly LinkLabel setupLink = new LinkLabel();
-        readonly CheckBox showBox = new CheckBox(), autostartBox = new CheckBox();
+        readonly CheckBox showBox = new CheckBox(), autostartBox = new CheckBox(), hideAllBox = new CheckBox();
         // heights in screen pixels, from 162 up to the tallest screen: all pets, and this pet's own
         readonly TrackBar sizeBar = new TrackBar(), petSizeBar = new TrackBar();
         readonly Label sizeValue = new Label(), petSizeLabel = new Label(), petSizeValue = new Label();
@@ -90,6 +90,7 @@ namespace AiPets
             loading = true;
             try { autostartBox.Checked = Autostart.Enabled; }
             catch (Exception) { autostartBox.Checked = false; }
+            hideAllBox.Checked = PetSettings.HidesAll(host != null ? host.Settings : Store.Load());
             loading = false;
         }
 
@@ -111,7 +112,16 @@ namespace AiPets
                 catch (Exception ex) { Log.Write("autostart: " + ex.Message); }
             };
 
-            var log = new LinkLabel { Text = "Log öffnen", AutoSize = true, Location = new Point(210, 19), LinkColor = Accent };
+            hideAllBox.Text = "Alle Pets ausblenden";
+            hideAllBox.AutoSize = true;
+            hideAllBox.Location = new Point(190, 18);
+            hideAllBox.CheckedChanged += delegate
+            {
+                if (!loading && host != null)
+                    host.SetAllHidden(hideAllBox.Checked);
+            };
+
+            var log = new LinkLabel { Text = "Log öffnen", AutoSize = true, Location = new Point(370, 19), LinkColor = Accent };
             log.LinkClicked += delegate
             {
                 try { Process.Start(Log.FilePath); }
@@ -122,7 +132,7 @@ namespace AiPets
             close.Click += delegate { Close(); };
             CancelButton = close;
 
-            bar.Controls.AddRange(new Control[] { autostartBox, log, close });
+            bar.Controls.AddRange(new Control[] { autostartBox, hideAllBox, log, close });
             return bar;
         }
 
@@ -563,6 +573,8 @@ namespace AiPets
                 avatar.Image = LoadIcon(p.Info, 48, s.Style);
                 state.Text = host != null ? host.StateText(p) : "–";
                 showBox.Checked = s.Enabled;
+                showBox.Enabled = !s.AllHidden;   // her own choice waits until all pets are shown again
+                hideAllBox.Checked = s.AllHidden;
                 styleLabel.Visible = styleBox.Visible = p.Info.HasOriginal;
                 styleBox.SelectedIndex = s.Style == "original" ? 1 : 0;
                 petSizeLabel.Text = "Größe von " + p.Info.Name;
