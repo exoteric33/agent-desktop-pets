@@ -12,7 +12,7 @@ namespace AiPets
     sealed class SettingsForm : Form
     {
         static readonly string[] ShellValues = { "direct", "powershell", "cmd" };
-        static readonly string[] ShellNames = { "Windows Terminal", "Windows Terminal · PowerShell", "Windows Terminal · Eingabeaufforderung" };
+        static readonly string[] ShellNames = { "Windows Terminal", "Windows Terminal · PowerShell", "Windows Terminal · Command Prompt" };
         static readonly Color Pane = Color.FromArgb(243, 243, 243);
         static readonly Color Selection = Color.FromArgb(230, 230, 230);
         static readonly Color Accent = Color.FromArgb(0, 103, 192);
@@ -44,7 +44,7 @@ namespace AiPets
         readonly ComboBox styleBox = new ComboBox();
         readonly Label styleLabel = new Label();
         readonly Button openButton = new Button(), homeButton = new Button();
-        // "Klick öffnet: Programm" shows program, arguments, terminal and folder; "Desktop-App" the app
+        // "Click opens: Program" shows program, arguments, terminal and folder; "Desktop app" the app
         // (and the folder, if the program opens the app: codex app); "Website" only the link
         readonly List<Control> programRows = new List<Control>(), appRows = new List<Control>(), linkRows = new List<Control>();
         readonly List<Control> folderRows = new List<Control>();
@@ -74,7 +74,7 @@ namespace AiPets
             AutoScaleDimensions = new SizeF(96F, 96F);
             AutoScaleMode = AutoScaleMode.Dpi;
             Font = new Font("Segoe UI", 9F);
-            Text = "aipets – Einstellungen";
+            Text = "aipets – Settings";
             ClientSize = new Size(700, 540);
             FormBorderStyle = FormBorderStyle.FixedSingle;
             MaximizeBox = false;
@@ -101,7 +101,7 @@ namespace AiPets
             var bar = new Panel { Dock = DockStyle.Bottom, Height = 56, BackColor = Pane };
             bar.Paint += delegate(object sender, PaintEventArgs e) { e.Graphics.DrawLine(SystemPens.ControlLight, 0, 0, bar.Width, 0); };
 
-            autostartBox.Text = "Mit Windows starten";
+            autostartBox.Text = "Start with Windows";
             autostartBox.AutoSize = true;
             autostartBox.Location = new Point(20, 18);
             autostartBox.CheckedChanged += delegate
@@ -112,7 +112,7 @@ namespace AiPets
                 catch (Exception ex) { Log.Write("autostart: " + ex.Message); }
             };
 
-            hideAllBox.Text = "Alle Pets ausblenden";
+            hideAllBox.Text = "Hide all pets";
             hideAllBox.AutoSize = true;
             hideAllBox.Location = new Point(190, 18);
             hideAllBox.CheckedChanged += delegate
@@ -121,14 +121,14 @@ namespace AiPets
                     host.SetAllHidden(hideAllBox.Checked);
             };
 
-            var log = new LinkLabel { Text = "Log öffnen", AutoSize = true, Location = new Point(370, 19), LinkColor = Accent };
+            var log = new LinkLabel { Text = "Open log", AutoSize = true, Location = new Point(370, 19), LinkColor = Accent };
             log.LinkClicked += delegate
             {
                 try { Process.Start(Log.FilePath); }
                 catch (Exception ex) { MessageBox.Show(this, ex.Message, Text); }
             };
 
-            var close = new Button { Text = "Schließen", Size = new Size(104, 30), Location = new Point(576, 13) };
+            var close = new Button { Text = "Close", Size = new Size(104, 30), Location = new Point(576, 13) };
             close.Click += delegate { Close(); };
             CancelButton = close;
 
@@ -171,7 +171,7 @@ namespace AiPets
             state.Location = new Point(133, 64);
             state.AutoSize = true;
             state.ForeColor = Muted;
-            showBox.Text = "Anzeigen";
+            showBox.Text = "Show";
             showBox.AutoSize = true;
             showBox.Location = new Point(135, 88);
             showBox.CheckedChanged += delegate
@@ -181,7 +181,7 @@ namespace AiPets
             };
             page.Controls.AddRange(new Control[] { avatar, title, state, showBox });
 
-            styleLabel.Text = "Aussehen";
+            styleLabel.Text = "Appearance";
             styleLabel.AutoSize = true;
             styleLabel.Location = new Point(292, 89);
             styleBox.DropDownStyle = ComboBoxStyle.DropDownList;
@@ -198,9 +198,9 @@ namespace AiPets
 
             // two height sliders, both live: the pets follow while a slider moves.
             // All pets: every pet snaps to it, own heights go. This pet: her own height until the next
-            // move of the first slider; "wie alle" gives it back earlier.
+            // move of the first slider; "like all" gives it back earlier.
             int y = 128;
-            AddLabel(page, "Größe aller Pets", y);
+            AddLabel(page, "Size of all pets", y);
             SetupSlider(page, sizeBar, sizeValue, y);
             sizeBar.ValueChanged += delegate
             {
@@ -236,7 +236,7 @@ namespace AiPets
                 }
                 ShowSizes();
             };
-            likeAllLink.Text = "wie alle";
+            likeAllLink.Text = "like all";
             likeAllLink.AutoSize = true;
             likeAllLink.Location = new Point(424, y);
             likeAllLink.LinkColor = Accent;
@@ -252,13 +252,13 @@ namespace AiPets
             sizeTimer.Tick += delegate { WriteHeights(); };
 
             y += 36;
-            AddLabel(page, "Klick öffnet", y);
+            AddLabel(page, "Click opens", y);
             // own panel: these radio buttons form one group, apart from anything else on the page
             var modes = new Panel { Location = new Point(136, y - 4), Size = new Size(336, 24) };
-            programMode.Text = "Programm";
-            appMode.Text = "Desktop-App";
+            programMode.Text = "Program";
+            appMode.Text = "Desktop app";
             websiteMode.Text = "Website";
-            // ShowPet puts "Website" behind "Desktop-App", or in its place for pets without an app
+            // ShowPet puts "Website" behind "Desktop app", or in its place for pets without an app
             programMode.Location = new Point(4, 3);
             appMode.Location = new Point(112, 3);
             websiteMode.Location = new Point(232, 3);
@@ -279,7 +279,7 @@ namespace AiPets
             page.Controls.Add(modes);
 
             y += 34;
-            programRows.Add(AddLabel(page, "Programm", y));
+            programRows.Add(AddLabel(page, "Program", y));
             programRows.Add(SetupBox(page, programBox, y, 330));
             linkRows.Add(AddLabel(page, "Link", y));
             linkRows.Add(SetupBox(page, urlBox, y, 330));
@@ -296,7 +296,7 @@ namespace AiPets
             appWhere.ForeColor = Muted;
             appWhere.AutoEllipsis = true;
             appRows.Add(appWhere);
-            var resetApp = new LinkLabel { Text = "App zurücksetzen", AutoSize = true, Location = new Point(139, y + 59), LinkColor = Accent };
+            var resetApp = new LinkLabel { Text = "Reset app", AutoSize = true, Location = new Point(139, y + 59), LinkColor = Accent };
             resetApp.LinkClicked += delegate
             {
                 if (current == null || host == null)
@@ -307,13 +307,13 @@ namespace AiPets
             appRows.Add(resetApp);
             page.Controls.AddRange(new Control[] { appName, pickApp, appWhere, resetApp });
             y += 34;
-            programRows.Add(AddLabel(page, "Argumente", y));
+            programRows.Add(AddLabel(page, "Arguments", y));
             programRows.Add(SetupBox(page, argsBox, y, 330));
-            linkRows.Add(AddLabel(page, "Öffnen in", y));
-            var browser = new Label { Text = "Standardbrowser", AutoSize = true, Location = new Point(140, y), ForeColor = Muted };
+            linkRows.Add(AddLabel(page, "Open in", y));
+            var browser = new Label { Text = "Default browser", AutoSize = true, Location = new Point(140, y), ForeColor = Muted };
             page.Controls.Add(browser);
             linkRows.Add(browser);
-            var resetUrl = new LinkLabel { Text = "Link zurücksetzen", AutoSize = true, Location = new Point(139, y + 25), LinkColor = Accent };
+            var resetUrl = new LinkLabel { Text = "Reset link", AutoSize = true, Location = new Point(139, y + 25), LinkColor = Accent };
             resetUrl.LinkClicked += delegate
             {
                 if (current == null || host == null)
@@ -324,7 +324,7 @@ namespace AiPets
             page.Controls.Add(resetUrl);
             linkRows.Add(resetUrl);
             y += 34;
-            programRows.Add(AddLabel(page, "Öffnen in", y));
+            programRows.Add(AddLabel(page, "Open in", y));
             programRows.Add(shellBox);
             shellBox.DropDownStyle = ComboBoxStyle.DropDownList;
             shellBox.Items.AddRange(ShellNames);
@@ -338,7 +338,7 @@ namespace AiPets
                 host.ChangeSetting(current, "shell", value == current.Info.Shell ? null : value);
             };
             page.Controls.Add(shellBox);
-            var reset = new LinkLabel { Text = "Programm, Argumente und „Öffnen in“ zurücksetzen", AutoSize = true, Location = new Point(139, y + 25), LinkColor = Accent };
+            var reset = new LinkLabel { Text = "Reset program, arguments and \"Open in\"", AutoSize = true, Location = new Point(139, y + 25), LinkColor = Accent };
             reset.LinkClicked += delegate
             {
                 if (current == null || host == null)
@@ -350,7 +350,7 @@ namespace AiPets
             programRows.Add(reset);
 
             y += 56;
-            folderRows.Add(AddLabel(page, "Arbeitsordner", y));
+            folderRows.Add(AddLabel(page, "Working folder", y));
             folderRows.Add(SetupBox(page, dirBox, y, 292));
             var browse = new Button { Text = "…", Location = new Point(436, y - 4), Size = new Size(34, 25) };
             browse.Click += delegate { BrowseFolder(); };
@@ -358,11 +358,11 @@ namespace AiPets
             folderRows.Add(browse);
 
             y += 38;
-            AddLabel(page, "Statusanzeige", y);
+            AddLabel(page, "Status display", y);
             hooks.Location = new Point(140, y);
             hooks.Size = new Size(330, 18);
             page.Controls.Add(hooks);
-            setupLink.Text = "Hooks einrichten";
+            setupLink.Text = "Set up hooks";
             setupLink.AutoSize = true;
             setupLink.Location = new Point(139, y + 19);
             setupLink.LinkColor = Accent;
@@ -394,7 +394,7 @@ namespace AiPets
                 if (current != null && host != null)
                     host.Launch(current);
             };
-            homeButton.Text = "Zurück in die Ecke";
+            homeButton.Text = "Back to the corner";
             homeButton.Location = new Point(308, y);
             homeButton.Size = new Size(162, 30);
             homeButton.Click += delegate
@@ -432,7 +432,7 @@ namespace AiPets
             return tallest;
         }
 
-        /// <summary>The heights behind the sliders; "wie alle" only does something for a pet with her own height.</summary>
+        /// <summary>The heights behind the sliders; "like all" only does something for a pet with her own height.</summary>
         void ShowSizes()
         {
             sizeValue.Text = PetSettings.HeightText(sizeBar.Value);
@@ -577,7 +577,7 @@ namespace AiPets
                 hideAllBox.Checked = s.AllHidden;
                 styleLabel.Visible = styleBox.Visible = p.Info.HasOriginal;
                 styleBox.SelectedIndex = s.Style == "original" ? 1 : 0;
-                petSizeLabel.Text = "Größe von " + p.Info.Name;
+                petSizeLabel.Text = "Size of " + p.Info.Name;
                 // not while a slider is dragged or its value still waits to be written: the thumb would jump back
                 if (pendingShared == 0 && pendingOwn == 0 && !sizeBar.Capture && !petSizeBar.Capture)
                 {
@@ -626,17 +626,17 @@ namespace AiPets
         {
             DesktopApp app = DesktopApp.Find(s.DesktopApp);
             appName.ForeColor = app != null ? Color.FromArgb(26, 26, 26) : Muted;
-            appName.Text = app != null ? app.ToString() : "nicht gefunden";
+            appName.Text = app != null ? app.ToString() : "not found";
             if (viaProgram)
-                appWhere.Text = "Ein Klick startet „" + DesktopApp.ProgramCommand(s, pet.AppCommand)
-                    + "“ im Arbeitsordner, ohne Terminalfenster.";
+                appWhere.Text = "A click runs \"" + DesktopApp.ProgramCommand(s, pet.AppCommand)
+                    + "\" in the working folder, without a terminal window.";
             else if (app != null)
-                appWhere.Text = app.AppId != null ? "App-Paket " + app.Family : PetForm.ShortPath(app.Exe);
+                appWhere.Text = app.AppId != null ? "App package " + app.Family : PetForm.ShortPath(app.Exe);
             else if (pet.AppFallback.Length > 0)
-                appWhere.Text = "Ein Klick startet stattdessen „" + DesktopApp.ProgramCommand(s, pet.AppFallback)
-                    + "“ im Terminal, das die App einrichtet und öffnet.";
+                appWhere.Text = "Instead, a click runs \"" + DesktopApp.ProgramCommand(s, pet.AppFallback)
+                    + "\" in the terminal, which sets up and opens the app.";
             else
-                appWhere.Text = "Installier die App oder wähl mit „…“ ihre exe aus.";
+                appWhere.Text = "Install the app or pick its exe with \"…\".";
         }
 
         /// <summary>Called by the tray every second: process states, and settings changed elsewhere (e.g. a pet's own menu).</summary>
@@ -699,7 +699,7 @@ namespace AiPets
                 return;
             using (var dialog = new FolderBrowserDialog())
             {
-                dialog.Description = "In welchem Ordner soll " + current.Info.Name + " starten?";
+                dialog.Description = "Which folder should " + current.Info.Name + " start in?";
                 dialog.SelectedPath = dirBox.Text;
                 if (dialog.ShowDialog(this) != DialogResult.OK)
                     return;
@@ -715,7 +715,7 @@ namespace AiPets
                 return;
             using (var dialog = new OpenFileDialog())
             {
-                dialog.Title = "Welche App soll " + current.Info.Name + " öffnen?";
+                dialog.Title = "Which app should " + current.Info.Name + " open?";
                 dialog.Filter = "Programme (*.exe)|*.exe";
                 DesktopApp app = DesktopApp.Find(host.SettingsOf(current).DesktopApp);
                 if (app != null && app.Exe != null)
@@ -812,8 +812,8 @@ namespace AiPets
             catch (UnauthorizedAccessException) { }
             string where = PetForm.ShortPath(file);
             if (ok)
-                return "✓ Hooks eingerichtet (" + where + ")";
-            return other ? "Hooks rufen eine andere aipets.exe auf" : "Keine Hooks in " + where;
+                return "✓ Hooks set up (" + where + ")";
+            return other ? "Hooks call a different aipets.exe" : "No hooks in " + where;
         }
 
         bool snapshot;

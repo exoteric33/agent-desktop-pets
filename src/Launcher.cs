@@ -36,8 +36,8 @@ namespace AiPets
             Log.Write("app command " + (code.HasValue ? "exit " + code.Value : "still running after 60 s")
                 + (output.Length > 0 ? ": " + output.Replace(Environment.NewLine, " | ") : ""));
             if (code.HasValue && code.Value != 0)
-                throw new InvalidOperationException(pet.Name + ": „" + DesktopApp.ProgramCommand(s, pet.AppCommand)
-                    + "“ ist mit Code " + code.Value + " fehlgeschlagen." + (output.Length > 0 ? "\n\n" + output : ""));
+                throw new InvalidOperationException(pet.Name + ": \"" + DesktopApp.ProgramCommand(s, pet.AppCommand)
+                    + "\" failed with code " + code.Value + "." + (output.Length > 0 ? "\n\n" + output : ""));
         }
 
         /// <summary>
@@ -52,8 +52,8 @@ namespace AiPets
             {
                 string url = NormalizeUrl(s.Url);
                 if (url == null)
-                    throw new UriFormatException(pet.Name + ": \"" + s.Url + "\" ist kein Link.\n\n"
-                        + "Trag in den Einstellungen einen Link mit http:// oder https:// ein.");
+                    throw new UriFormatException(pet.Name + ": \"" + s.Url + "\" is not a link.\n\n"
+                        + "Enter a link starting with http:// or https:// in the settings.");
                 return new ProcessStartInfo(url) { UseShellExecute = true };
             }
             if (s.OpensApp)
@@ -71,8 +71,8 @@ namespace AiPets
                     return psi;
                 }
                 if (pet.AppFallback.Length == 0)
-                    throw new FileNotFoundException(pet.Name + ": Die Desktop-App wurde nicht gefunden.\n\n"
-                        + "Installier sie oder wähl in den Einstellungen unter „App“ ihre exe aus.");
+                    throw new FileNotFoundException(pet.Name + ": The desktop app was not found.\n\n"
+                        + "Install it or pick its exe under \"App\" in the settings.");
                 return TerminalStartInfo(pet, s, pet.AppFallback);
             }
             return TerminalStartInfo(pet, s, s.Args);
@@ -86,13 +86,13 @@ namespace AiPets
                 return psi.FileName + "\n(im Standardbrowser)";
             DesktopApp app = s.OpensApp ? DesktopApp.Find(s.DesktopApp) : null;
             if (psi.CreateNoWindow)
-                return psi.FileName + " " + psi.Arguments + "\n(ohne Fenster, in " + psi.WorkingDirectory
-                    + (app != null ? "; öffnet die Desktop-App " + app : "; Desktop-App nicht gefunden") + ")";
+                return psi.FileName + " " + psi.Arguments + "\n(no window, in " + psi.WorkingDirectory
+                    + (app != null ? "; opens the desktop app " + app : "; desktop app not found") + ")";
             if (app != null)
-                return (psi.FileName + " " + psi.Arguments).TrimEnd() + "\n(Desktop-App " + app + ", "
-                    + (app.AppId != null ? "App-Paket " + app.Family : "in " + psi.WorkingDirectory) + ")";
+                return (psi.FileName + " " + psi.Arguments).TrimEnd() + "\n(desktop app " + app + ", "
+                    + (app.AppId != null ? "App package " + app.Family : "in " + psi.WorkingDirectory) + ")";
             return psi.FileName + " " + psi.Arguments + "\n(in " + psi.WorkingDirectory + ")"
-                + (s.OpensApp ? "\n(Desktop-App nicht gefunden, deshalb „" + DesktopApp.ProgramCommand(s, pet.AppFallback) + "“)" : "");
+                + (s.OpensApp ? "\n(desktop app not found, so \"" + DesktopApp.ProgramCommand(s, pet.AppFallback) + "\")" : "");
         }
 
         /// <summary>
@@ -188,8 +188,8 @@ namespace AiPets
 
             string program = ProgramPath(pet, s, env);
             if (program == null)
-                throw new FileNotFoundException(pet.Name + ": \"" + s.Program + "\" wurde nicht gefunden.\n\n"
-                    + "Trag in den Einstellungen den vollen Pfad ein oder nimm den Ordner in den PATH auf.");
+                throw new FileNotFoundException(pet.Name + ": \"" + s.Program + "\" was not found.\n\n"
+                    + "Enter the full path in the settings or add its folder to PATH.");
             string workDir = WorkDirOf(s);
             string args = (arguments ?? "").Trim();
 

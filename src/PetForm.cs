@@ -90,7 +90,7 @@ namespace AiPets
             settingsStamp = Store.Stamp();
             Ini initial;
             if (!Store.TryLoad(out initial))
-                throw new IOException("Die Pet-Einstellungen sind momentan nicht lesbar.");
+                throw new IOException("The pet settings cannot be read right now.");
             settings = PetSettings.From(pet, initial);
             LoadAppearance(settings.Style);
             status = pet.Status.Length > 0 ? new StatusMonitor(pet.Status) : null;
@@ -1025,47 +1025,47 @@ namespace AiPets
             var strip = new ContextMenuStrip();
             var open = new ToolStripMenuItem(pet.OpenText, null, delegate { OpenAgent(); });
             open.Font = new Font(open.Font, FontStyle.Bold);
-            var folder = new ToolStripMenuItem("Ordner", null, delegate { ChooseFolder(); });
-            var opens = new ToolStripMenuItem("Klick öffnet");
-            var openProgram = new ToolStripMenuItem("Programm", null, delegate { SetMode("program"); });
-            var openApp = new ToolStripMenuItem("Desktop-App", null, delegate { SetMode("app"); });
+            var folder = new ToolStripMenuItem("Folder", null, delegate { ChooseFolder(); });
+            var opens = new ToolStripMenuItem("Click opens");
+            var openProgram = new ToolStripMenuItem("Program", null, delegate { SetMode("program"); });
+            var openApp = new ToolStripMenuItem("Desktop app", null, delegate { SetMode("app"); });
             var openWebsite = new ToolStripMenuItem("Website", null, delegate { SetMode("website"); });
             opens.DropDownItems.AddRange(new ToolStripItem[] { openProgram, openApp, openWebsite });
-            var appearance = new ToolStripMenuItem("Aussehen");
+            var appearance = new ToolStripMenuItem("Appearance");
             var pixel = new ToolStripMenuItem("Pixel", null, delegate { SetStyle("pixel"); });
             var original = new ToolStripMenuItem("Original", null, delegate { SetStyle("original"); });
             appearance.DropDownItems.AddRange(new ToolStripItem[] { pixel, original });
             // heights of all pets (Tag = px), then this pet's own, each group under a grey heading
-            var sizes = new ToolStripMenuItem("Größe");
+            var sizes = new ToolStripMenuItem("Size");
             var shared = new List<ToolStripMenuItem>();
             for (int i = 1; i <= 4; i++)
             {
                 int px = i * PetSettings.HeightUnit;
                 shared.Add(new ToolStripMenuItem(PetSettings.HeightText(px), null, delegate { SetSharedHeight(px); }) { Tag = px });
             }
-            var likeAll = new ToolStripMenuItem("Wie alle", null, delegate { SetOwnHeight(0); });
-            var smaller = new ToolStripMenuItem("Kleiner", null, delegate { SetOwnHeight(height * 4 / 5); });
-            var bigger = new ToolStripMenuItem("Größer", null, delegate { SetOwnHeight(height * 5 / 4); });
-            var screenHigh = new ToolStripMenuItem("So hoch wie der Bildschirm", null, delegate { SetOwnHeight(ScreenHeight()); });
-            sizes.DropDownItems.Add(new ToolStripMenuItem("Alle Pets") { Enabled = false });
+            var likeAll = new ToolStripMenuItem("Like all", null, delegate { SetOwnHeight(0); });
+            var smaller = new ToolStripMenuItem("Smaller", null, delegate { SetOwnHeight(height * 4 / 5); });
+            var bigger = new ToolStripMenuItem("Bigger", null, delegate { SetOwnHeight(height * 5 / 4); });
+            var screenHigh = new ToolStripMenuItem("As tall as the screen", null, delegate { SetOwnHeight(ScreenHeight()); });
+            sizes.DropDownItems.Add(new ToolStripMenuItem("All pets") { Enabled = false });
             sizes.DropDownItems.AddRange(shared.ToArray());
             sizes.DropDownItems.Add(new ToolStripSeparator());
-            sizes.DropDownItems.Add(new ToolStripMenuItem("Nur " + pet.Name) { Enabled = false });
+            sizes.DropDownItems.Add(new ToolStripMenuItem("Only " + pet.Name) { Enabled = false });
             sizes.DropDownItems.AddRange(new ToolStripItem[] { likeAll, smaller, bigger, screenHigh });
-            var home = new ToolStripMenuItem("Zurück in die Ecke", null, delegate
+            var home = new ToolStripMenuItem("Back to the corner", null, delegate
             {
                 MoveTo(HomeAnchor(), true);
                 SavePosition();
             });
-            var hide = new ToolStripMenuItem("Ausblenden", null, delegate
+            var hide = new ToolStripMenuItem("Hide", null, delegate
             {
                 // saved here as well: she stays hidden after a restart even if the tray does not answer now
                 Store.Update(pet.Id, "enabled", "0");
                 if (!Ipc.SendToHost("hide " + pet.Id))
                     Close();
             });
-            var prefs = new ToolStripMenuItem("Einstellungen …", null, delegate { Ipc.SendToHost("settings " + pet.Id); });
-            var quit = new ToolStripMenuItem("aipets beenden", null, delegate
+            var prefs = new ToolStripMenuItem("Settings …", null, delegate { Ipc.SendToHost("settings " + pet.Id); });
+            var quit = new ToolStripMenuItem("Quit aipets", null, delegate
             {
                 if (!Ipc.SendToHost("quit"))
                     Close();
@@ -1081,7 +1081,7 @@ namespace AiPets
                 appearance.Visible = pet.HasOriginal;
                 pixel.Checked = s.Style == "pixel";
                 original.Checked = s.Style == "original";
-                folder.Text = "Ordner: " + ShortPath(s.WorkDir) + " …";
+                folder.Text = "Folder: " + ShortPath(s.WorkDir) + " …";
                 folder.ToolTipText = s.WorkDir;
                 // only the terminal and an app opened by the program (codex app) use the working folder
                 folder.Visible = s.OpensProgram || (s.OpensApp && Launcher.AppViaProgram(pet, s));
@@ -1147,17 +1147,17 @@ namespace AiPets
             ReloadSettings();
         }
 
-        /// <summary>Tooltip of "Desktop-App": which app a click opens and how, or what happens without one.</summary>
+        /// <summary>Tooltip of "Desktop app": which app a click opens and how, or what happens without one.</summary>
         string AppText(PetSettings s)
         {
             if (s.DesktopApp.Length == 0)
                 return null;
             DesktopApp app = DesktopApp.Find(s.DesktopApp);
-            string text = app != null ? app.ToString() : "nicht gefunden";
+            string text = app != null ? app.ToString() : "not found";
             if (Launcher.AppViaProgram(pet, s))
-                return text + ", über „" + DesktopApp.ProgramCommand(s, pet.AppCommand) + "“";
+                return text + ", via \"" + DesktopApp.ProgramCommand(s, pet.AppCommand) + "\"";
             if (app == null && pet.AppFallback.Length > 0)
-                return text + ", ein Klick startet „" + DesktopApp.ProgramCommand(s, pet.AppFallback) + "“";
+                return text + ", a click runs \"" + DesktopApp.ProgramCommand(s, pet.AppFallback) + "\"";
             return text;
         }
 
@@ -1165,7 +1165,7 @@ namespace AiPets
         {
             using (var dialog = new FolderBrowserDialog())
             {
-                dialog.Description = "In welchem Ordner soll " + pet.Name + " starten?";
+                dialog.Description = "Which folder should " + pet.Name + " start in?";
                 dialog.SelectedPath = ReadSettings().WorkDir;
                 if (dialog.ShowDialog(this) == DialogResult.OK && Directory.Exists(dialog.SelectedPath))
                 {

@@ -10,7 +10,7 @@ using System.Threading;
 namespace AiPets
 {
     /// <summary>
-    /// aipets.exe --install / --uninstall and "Hooks einrichten" in the settings window: autostart plus the
+    /// aipets.exe --install / --uninstall and "Set up hooks" in the settings window: autostart plus the
     /// status hooks of every installed agent (Claude Code, Codex, Hermes Agent, Cursor), all pointing at this exe.
     /// Only aipets' own entries are touched, a file is only written when something changes, and the old
     /// version is kept as &lt;file&gt;.bak-aipets.
@@ -77,11 +77,11 @@ namespace AiPets
             try
             {
                 Autostart.Choose(true);   // installing again also takes back an earlier "no"
-                steps.Add(new Step("Mit Windows starten", true, "an"));
+                steps.Add(new Step("Start with Windows", true, "on"));
             }
             catch (Exception ex)
             {
-                steps.Add(new Step("Mit Windows starten", false, ex.Message));
+                steps.Add(new Step("Start with Windows", false, ex.Message));
             }
             foreach (string source in new[] { "claude", "codex", "hermes", "cursor" })
                 steps.Add(Hooks(source, exe, true));
@@ -94,11 +94,11 @@ namespace AiPets
             try
             {
                 Autostart.Enabled = false;
-                steps.Add(new Step("Mit Windows starten", true, "aus"));
+                steps.Add(new Step("Start with Windows", true, "off"));
             }
             catch (Exception ex)
             {
-                steps.Add(new Step("Mit Windows starten", false, ex.Message));
+                steps.Add(new Step("Start with Windows", false, ex.Message));
             }
             foreach (string source in new[] { "claude", "codex", "hermes", "cursor" })
                 steps.Add(Hooks(source, exe, false));
@@ -117,13 +117,13 @@ namespace AiPets
                     case "hermes": return Hermes(HermesHome, exe, install);
                     case "cursor": return Cursor(CursorHome, exe, install);
                 }
-                return new Step(source, false, "für diese Statusquelle gibt es keine Hooks");
+                return new Step(source, false, "this status source has no hooks");
             }
             catch (Exception ex)
             {
                 Log.Write("setup " + source + ": " + ex);
                 string name = source == "claude" ? "Claude Code" : source == "codex" ? "Codex" : source == "cursor" ? "Cursor" : "Hermes Agent";
-                return new Step(name, false, "Fehler: " + ex.Message);
+                return new Step(name, false, "Error: " + ex.Message);
             }
         }
 
@@ -144,7 +144,7 @@ namespace AiPets
         {
             const string name = "Claude Code";
             if (!Directory.Exists(Path.GetDirectoryName(settingsPath)))
-                return new Step(name, !install, "nicht installiert");
+                return new Step(name, !install, "not installed");
             var groups = new List<KeyValuePair<string, JsonObject>>();
             foreach (string[] e in ClaudeEvents)
             {
@@ -179,7 +179,7 @@ namespace AiPets
         {
             const string name = "Codex";
             if (!Directory.Exists(home))
-                return new Step(name, !install, "nicht installiert");
+                return new Step(name, !install, "not installed");
             string path = Path.Combine(home, "hooks.json");
             var groups = new List<KeyValuePair<string, JsonObject>>();
             foreach (string[] e in CodexEvents)
@@ -200,8 +200,8 @@ namespace AiPets
                 return new Step(name, true, Outcome(changed, false) + where);
             string problem = trust ? TrustCodexHooks(path) : null;
             if (problem != null)
-                return new Step(name, false, Outcome(changed, true) + where + ", aber nicht freigegeben (" + problem + "). In Codex einmal /hooks öffnen und die aipets-Hooks freigeben.");
-            return new Step(name, true, Outcome(changed, true) + " und freigegeben" + where);
+                return new Step(name, false, Outcome(changed, true) + where + ", but not approved (" + problem + "). Open /hooks in Codex once and approve the aipets hooks.");
+            return new Step(name, true, Outcome(changed, true) + " and approved" + where);
         }
 
         /// <summary>
@@ -212,7 +212,7 @@ namespace AiPets
         {
             string codex = Launcher.Resolve("codex", @"%APPDATA%\npm\codex.cmd", Environment.GetEnvironmentVariable("PATH"));
             if (codex == null)
-                return "codex nicht gefunden";
+                return "codex not found";
             ProcessStartInfo psi = codex.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase) || codex.EndsWith(".bat", StringComparison.OrdinalIgnoreCase)
                 ? new ProcessStartInfo("cmd.exe", "/d /s /c \"\"" + codex + "\" app-server\"")
                 : new ProcessStartInfo(codex, "app-server");
@@ -255,7 +255,7 @@ namespace AiPets
                     {
                         lock (errors)
                             Log.Write("codex app-server did not answer initialize: " + errors.ToString().Trim());
-                        return "codex app-server antwortet nicht";
+                        return "codex app-server does not respond";
                     }
                     Send(p, "{\"method\":\"initialized\"}");
                     Send(p, "{\"id\":2,\"method\":\"hooks/list\",\"params\":{\"cwds\":[" + Json.Quote(UserProfile) + "]}}");
@@ -263,7 +263,7 @@ namespace AiPets
                     var result = listed != null ? listed.Get("result") as JsonObject : null;
                     var data = result != null ? result.Get("data") as List<object> : null;
                     if (data == null)
-                        return "hooks/list ohne Ergebnis";
+                        return "hooks/list returned no result";
 
                     var value = new StringBuilder();
                     int found = 0;
@@ -288,14 +288,14 @@ namespace AiPets
                     }
                     Log.Write("codex trust: " + found + " aipets hooks listed, " + (value.Length == 0 ? "all trusted" : "trusting the rest"));
                     if (found == 0)
-                        return "Codex listet die Hooks nicht, ist das Feature „hooks“ aus?";
+                        return "Codex does not list the hooks; is the \"hooks\" feature off?";
                     if (value.Length == 0)
                         return null;   // all trusted already
                     Send(p, "{\"id\":3,\"method\":\"config/batchWrite\",\"params\":{\"edits\":[{\"keyPath\":\"hooks.state\",\"value\":{"
                         + value + "},\"mergeStrategy\":\"upsert\"}],\"reloadUserConfig\":true}}");
                     JsonObject written = Reply(lines, 3);
                     if (written == null)
-                        return "config/batchWrite antwortet nicht";
+                        return "config/batchWrite does not respond";
                     return written.Get("error") != null ? "config/batchWrite: " + Json.Write(written.Get("error")).Trim() : null;
                 }
                 finally
@@ -388,7 +388,7 @@ namespace AiPets
                 return false;
             var root = (empty ? new JsonObject() : Json.Parse(original)) as JsonObject;
             if (root == null)
-                throw new FormatException(Path.GetFileName(path) + " enthält kein JSON-Objekt");
+                throw new FormatException(Path.GetFileName(path) + " contains no JSON object");
             string before = empty ? "" : Json.Write(Json.Parse(original));
             if (empty && description != null)
                 root.Set("description", JsonValue.Of(description));
@@ -397,7 +397,7 @@ namespace AiPets
             if (hooks == null)
             {
                 if (root.Get("hooks") != null)
-                    throw new FormatException("hooks muss ein JSON-Objekt sein");
+                    throw new FormatException("hooks must be a JSON object");
                 if (desired == null)
                     return false;
                 hooks = new JsonObject();
@@ -428,7 +428,7 @@ namespace AiPets
                     if (groups == null)
                     {
                         if (hooks.Get(d.Key) != null)
-                            throw new FormatException(d.Key + " muss eine JSON-Liste sein");
+                            throw new FormatException(d.Key + " must be a JSON list");
                         groups = new List<object>();
                         hooks.Set(d.Key, groups);
                     }
@@ -476,7 +476,7 @@ namespace AiPets
         {
             const string name = "Cursor";
             if (!Directory.Exists(home))
-                return new Step(name, !install, "nicht installiert");
+                return new Step(name, !install, "not installed");
             string path = Path.Combine(home, "hooks.json");
             bool changed = EditCursorHooks(path, install ? CursorCommand(exe) : null);
             return new Step(name, true, Outcome(changed, install) + " (" + PetForm.ShortPath(path) + ")");
@@ -502,7 +502,7 @@ namespace AiPets
                 return false;
             var root = (empty ? new JsonObject() : Json.Parse(original)) as JsonObject;
             if (root == null)
-                throw new FormatException(Path.GetFileName(path) + " enthält kein JSON-Objekt");
+                throw new FormatException(Path.GetFileName(path) + " contains no JSON object");
             string before = empty ? "" : Json.Write(Json.Parse(original));
             if (command != null && root.Get("version") == null)
                 root.Set("version", JsonValue.Of(1));
@@ -511,7 +511,7 @@ namespace AiPets
             if (hooks == null)
             {
                 if (root.Get("hooks") != null)
-                    throw new FormatException("hooks muss ein JSON-Objekt sein");
+                    throw new FormatException("hooks must be a JSON object");
                 if (command == null)
                     return false;
                 hooks = new JsonObject();
@@ -539,7 +539,7 @@ namespace AiPets
                     if (entries == null)
                     {
                         if (hooks.Get(ev) != null)
-                            throw new FormatException(ev + " muss eine JSON-Liste sein");
+                            throw new FormatException(ev + " must be a JSON list");
                         entries = new List<object>();
                         hooks.Set(ev, entries);
                     }
@@ -585,12 +585,12 @@ namespace AiPets
             const string name = "Hermes Agent";
             string config = Path.Combine(home, "config.yaml");
             if (!File.Exists(config))
-                return new Step(name, !install, Directory.Exists(home) ? "config.yaml fehlt (Hermes einmal starten)" : "nicht installiert");
+                return new Step(name, !install, Directory.Exists(home) ? "config.yaml missing (start Hermes once)" : "not installed");
             bool changed = EditHermesConfig(config, exe, install);
             bool approved = EditHermesAllowlist(Path.Combine(home, "shell-hooks-allowlist.json"), exe, install);
-            string text = Outcome(changed || approved, install) + (install ? " und freigegeben" : "") + " (" + PetForm.ShortPath(config) + ")";
+            string text = Outcome(changed || approved, install) + (install ? " and approved" : "") + " (" + PetForm.ShortPath(config) + ")";
             if (changed)
-                text += ". Ein laufender Hermes-Gateway übernimmt das erst nach einem Neustart";
+                text += ". A running Hermes gateway only picks this up after a restart";
             return new Step(name, true, text);
         }
 
@@ -611,12 +611,12 @@ namespace AiPets
             var lines = new List<string>(original.Split('\n'));   // a trailing \r stays part of its line
             var tops = lines.FindAll(l => Regex.IsMatch(l, @"^hooks\s*:"));
             if (tops.Count > 1)
-                throw new FormatException("Mehrere hooks-Blöcke in config.yaml; bitte zu einem Block zusammenführen.");
+                throw new FormatException("Several hooks blocks in config.yaml; please merge them into one block.");
             int top = lines.FindIndex(l => Regex.IsMatch(l, @"^hooks\s*:"));
             if (top >= 0)
             {
                 if (!Regex.IsMatch(lines[top], @"^hooks:\s*(\{\s*\}|null|~)?\s*(#.*)?$"))
-                    throw new FormatException("hooks in config.yaml muss als eingerückter YAML-Block vorliegen.");
+                    throw new FormatException("hooks in config.yaml must be an indented YAML block.");
                 if (install)
                     lines[top] = Regex.Replace(lines[top], @"^(hooks:)\s*(\{\s*\}|null|~)", "$1");
                 int end = BlockEnd(lines, top);
@@ -624,7 +624,7 @@ namespace AiPets
                 {
                     var keys = lines.GetRange(top + 1, end - top - 1).FindAll(l => Regex.IsMatch(l, @"^\s+" + e[0] + @":\s*"));
                     if (keys.Count > 1 || keys.Exists(l => !Regex.IsMatch(l, @"^\s+" + e[0] + @":\s*(\[\s*\])?\s*(#.*)?$")))
-                        throw new FormatException(e[0] + " muss einmal als eingerückte YAML-Liste vorliegen.");
+                        throw new FormatException(e[0] + " must appear once as an indented YAML list.");
                 }
             }
             if (top < 0 && !install)
@@ -860,13 +860,13 @@ namespace AiPets
                 return false;
             var root = (empty ? new JsonObject() : Json.Parse(original)) as JsonObject;
             if (root == null)
-                throw new FormatException(Path.GetFileName(path) + " enthält kein JSON-Objekt");
+                throw new FormatException(Path.GetFileName(path) + " contains no JSON object");
             string before = empty ? "" : Json.Write(Json.Parse(original));
             var approvals = root.Get("approvals") as List<object>;
             if (approvals == null)
             {
                 if (root.Get("approvals") != null)
-                    throw new FormatException("approvals muss eine JSON-Liste sein");
+                    throw new FormatException("approvals must be a JSON list");
                 approvals = new List<object>();
                 root.Set("approvals", approvals);
             }
@@ -915,8 +915,8 @@ namespace AiPets
         static string Outcome(bool changed, bool install)
         {
             if (install)
-                return changed ? "Hooks eingetragen" : "Hooks schon eingerichtet";
-            return changed ? "Hooks entfernt" : "keine aipets-Hooks";
+                return changed ? "Hooks added" : "Hooks already set up";
+            return changed ? "Hooks removed" : "no aipets hooks";
         }
 
         /// <summary>Writes the file, keeping the previous content as .bak-aipets. JSON written from scratch gets CRLF if the old file had it.</summary>

@@ -1,10 +1,10 @@
 @echo off
-rem aipets entfernen (Doppelklick): beendet aipets, schaltet "Mit Windows starten" aus und entfernt
-rem die Status-Hooks aus Claude Code, Codex und Hermes. Den Ordner danach einfach loeschen.
+rem Uninstall aipets (double-click): quits aipets, turns "Start with Windows" off and removes
+rem the status hooks from Claude Code, Codex, Hermes and Cursor. Then just delete the folder.
 setlocal
 cd /d "%~dp0"
 if not exist "%~dp0aipets.exe" (
-  echo aipets.exe fehlt, es gibt nichts zu entfernen.
+  echo aipets.exe is missing, there is nothing to remove.
   pause
   exit /b 1
 )

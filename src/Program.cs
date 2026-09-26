@@ -157,7 +157,7 @@ namespace AiPets
         {
             Log.Tag = install ? "install" : "uninstall";
             if (!install && !quiet && MessageBox.Show(
-                    "aipets entfernen?\n\nDas beendet aipets und entfernt „Mit Windows starten“ sowie die Status-Hooks aus Claude Code, Codex, Hermes und Cursor.",
+                    "Remove aipets?\n\nThis quits aipets and removes \"Start with Windows\" as well as the status hooks from Claude Code, Codex, Hermes and Cursor.",
                     App.Name, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
                 return 1;
             if (!install)
@@ -168,23 +168,23 @@ namespace AiPets
             {
                 if (TrayRunning())
                 {
-                    steps.Add(new Setup.Step("aipets", true, "läuft"));
+                    steps.Add(new Setup.Step("aipets", true, "running"));
                 }
                 else
                 {
                     // through explorer, so the tray does not inherit the installer's environment
                     Process.Start("explorer.exe", "\"" + App.ExePath + "\"");
-                    steps.Add(new Setup.Step("aipets", true, "gestartet (Icon im Infobereich, Linksklick = Einstellungen)"));
+                    steps.Add(new Setup.Step("aipets", true, "started (icon in the notification area, left click = settings)"));
                 }
             }
 
-            bool ok = steps.TrueForAll(s => s.Ok || s.Text == "nicht installiert");
-            var text = new StringBuilder(install ? "aipets ist eingerichtet." : "aipets ist entfernt.");
-            text.Append(ok ? "\n\n" : " Nicht alles hat geklappt, siehe unten.\n\n");
+            bool ok = steps.TrueForAll(s => s.Ok || s.Text == "not installed");
+            var text = new StringBuilder(install ? "aipets is set up." : "aipets is removed.");
+            text.Append(ok ? "\n\n" : " Not everything worked, see below.\n\n");
             foreach (Setup.Step step in steps)
                 text.Append(step).Append('\n');
             if (!install)
-                text.Append("\nDen Ordner ").Append(App.Dir).Append(" kannst du jetzt löschen.");
+                text.Append("\nYou can now delete the folder ").Append(App.Dir).Append(".");
             Log.Write(text.ToString().Replace('\n', ' '));
             Console.WriteLine(text);
             if (!quiet)
@@ -198,7 +198,7 @@ namespace AiPets
             PetInfo info = PetInfo.ById(id);
             if (info == null)
             {
-                Console.WriteLine("Kein Pet mit der id " + id);
+                Console.WriteLine("No pet with the id " + id);
                 return 2;
             }
             PetSettings s = PetSettings.From(info, Store.Load());

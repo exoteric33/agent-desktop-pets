@@ -1,162 +1,162 @@
 # aipets
 
-*Agent desktop pets for Windows — pixel-art desktop pets, one per AI agent: Claude Code, Codex, Cursor, Copilot, Gemini, Grok, Hermes. Documentation in German.*
+*Agent desktop pets for Windows — pixel-art desktop pets, one per AI agent: Claude Code, Codex, Cursor, Copilot, Gemini, Grok, Hermes.*
 
-Pixel-Art-Desktop-Pets für Windows, eins pro KI-Agent. Die Pets sitzen auf der Taskleiste. Ein Klick öffnet ihren Agenten im Terminal, als Desktop-App oder seine Website im Browser, und sie zeigen an, ob er gerade arbeitet, auf dich wartet oder fertig ist.
+Pixel-art desktop pets for Windows, one per AI agent. The pets sit on the taskbar. A click opens their agent in the terminal, as a desktop app or its website in the browser, and they show whether the agent is working, waiting for you or done.
 
-| Pet | Klick öffnet (Standard) | Umschaltbar auf | Status kommt von |
+| Pet | Click opens (default) | Can switch to | Status comes from |
 |---|---|---|---|
-| **Claude** | Claude Code im Windows Terminal | Claude-Desktop-App, claude.ai | Claude-Code-Hooks |
-| **Hermes** | Hermes Agent in PowerShell (im Windows Terminal) | Hermes Desktop, hermes-agent.nousresearch.com | Hermes-Shell-Hooks |
-| **Astra** | Codex CLI im Windows Terminal | Codex-Desktop-App (unter Windows „ChatGPT“), chatgpt.com/codex | Codex-Hooks |
-| **Gemini** | gemini.google.com im Standardbrowser | Gemini CLI (`gemini`) | – |
-| **Grok** | grok.com im Standardbrowser | Grok CLI (`grok`) | – |
-| **Cursor** | Cursor-Desktop-App | Cursor im Terminal (`cursor`), cursor.com | Cursor-Hooks |
-| **Copilot** | Microsoft-Copilot-Desktop-App | copilot.microsoft.com | – |
+| **Claude** | Claude Code in Windows Terminal | Claude desktop app, claude.ai | Claude Code hooks |
+| **Hermes** | Hermes Agent in PowerShell (in Windows Terminal) | Hermes Desktop, hermes-agent.nousresearch.com | Hermes shell hooks |
+| **Astra** | Codex CLI in Windows Terminal | Codex desktop app (called "ChatGPT" on Windows), chatgpt.com | Codex hooks |
+| **Gemini** | gemini.google.com in the default browser | Gemini CLI (`gemini`) | – |
+| **Grok** | grok.com in the default browser | Grok CLI (`grok`) | – |
+| **Cursor** | Cursor desktop app | Cursor in the terminal (`cursor`), cursor.com | Cursor hooks |
+| **Copilot** | Microsoft Copilot desktop app | copilot.microsoft.com | – |
 
-**Cursor in zwei Optiken:** Unter **Einstellungen → Cursor → Aussehen** oder **Rechtsklick auf Cursor → Aussehen** wählst du **Pixel** (Standard, wie Grok) oder **Original** (fein aufgelöstes Entwurfsbild). Beide sind animiert: Atmen, wehende Haare, Blinzeln, Zwinkern beim Hover, eine kleine Fingerbewegung, Klickfreude und Schlafen. Der Wechsel wirkt sofort und behält Position, Höhe und Sichtbarkeit. Es bleibt ein einziges Pet. Den Status bekommt Cursor über Cursors Hooks (siehe unten); ein „?“ für „wartet auf dich“ gibt es bei Cursor nicht, weil Cursor dafür kein Ereignis meldet.
+**Cursor in two looks:** Under **Settings → Cursor → Appearance** or **right-click Cursor → Appearance** you choose **Pixel** (default, like Grok) or **Original** (the high-resolution draft image). Both are animated: breathing, flowing hair, blinking, a wink on hover, a small finger gesture, joy on click and sleeping. The switch takes effect immediately and keeps position, height and visibility. It stays a single pet. Cursor gets its status from Cursor's hooks (see below); there is no "?" for "waiting for you" with Cursor, because Cursor reports no event for it.
 
-**Copilot in zwei Optiken:** Entwurf 1 mit türkisen Haaren, weißem Shirt und Winken. Unter **Einstellungen → Copilot → Aussehen** oder **Rechtsklick → Aussehen** wählst du **Pixel** (Standard, passend zu Grok und Cursor) oder **Original**. Beide Optiken animieren Atmen, Haare, Blinzeln, ein Hover-Lächeln mit beiden geschlossenen Augen und Winken, Klickfreude mit Hüpfer sowie Schlafen. Das Shirtlogo folgt als Stoffdruck der Schattierung und Bewegung des Shirts. Position, Höhe, Sichtbarkeit und Ebenen bleiben beim Wechsel erhalten. Ein Klick öffnet die Microsoft-Copilot-App; alternativ wählst du die Website. Es gibt keine eingerichtete Statusquelle und keinen voreingestellten Terminalbefehl; das allgemeine Feld „Programm“ bleibt für einen selbst gewählten Befehl verfügbar. Dieses Pet gehört zu Microsoft Copilot, nicht zu GitHub Copilot.
+**Copilot in two looks:** Draft 1 with turquoise hair, a white shirt and a wave. Under **Settings → Copilot → Appearance** or **right-click → Appearance** you choose **Pixel** (default, matching Grok and Cursor) or **Original**. Both looks animate breathing, hair, blinking, a hover smile with both eyes closed and a wave, joy on click with a hop, and sleeping. The shirt logo follows the shading and movement of the shirt like a fabric print. Position, height, visibility and layers are kept when switching. A click opens the Microsoft Copilot app; alternatively choose the website. There is no status source and no preset terminal command; the general "Program" field remains available for a command of your choice. This pet belongs to Microsoft Copilot, not GitHub Copilot.
 
-## Schnellstart
+## Quick start
 
-Voraussetzung: Windows 10/11 mit .NET Framework 4.8. Windows Terminal ist optional; ohne es wird die Windows-Konsole verwendet. Für das fertige Paket sind weder Python noch ein separat installiertes .NET-SDK nötig.
+Requirements: Windows 10/11 with .NET Framework 4.8. Windows Terminal is optional; without it the Windows console is used. The ready-made package needs neither Python nor a separately installed .NET SDK.
 
-1. **Installieren:** Den Ordner dorthin legen, wo er bleiben soll (klonen oder ZIP entpacken), und **`install.cmd` doppelklicken.** Autostart und Hooks merken sich den Pfad.
-   - Im Quellcode-Ordner wird `aipets.exe` mit dem C#-Compiler aus Windows gebaut. Das Release-ZIP enthält die fertige exe und überspringt den Build.
-   - Schaltet „Mit Windows starten“ ein.
-   - Trägt die Status-Hooks für Claude Code, Codex, Hermes Agent und Cursor ein, soweit sie installiert sind, und richtet die Freigaben ein. Für die automatische Codex-Freigabe muss die Codex CLI vorhanden sein; andernfalls zeigt die Zusammenfassung die nötigen Schritte unter `/hooks`.
-   - Startet aipets und zeigt am Ende, was es gemacht hat.
+1. **Install:** Put the folder where it should stay (clone or extract the ZIP) and **double-click `install.cmd`.** Autostart and hooks remember the path.
+   - In the source folder, `aipets.exe` is built with the C# compiler that ships with Windows. The release ZIP contains the finished exe and skips the build.
+   - Turns on "Start with Windows".
+   - Adds the status hooks for Claude Code, Codex, Hermes Agent and Cursor, as far as they are installed, and sets up the approvals. Automatic Codex approval needs the Codex CLI; otherwise the summary shows the steps needed under `/hooks`.
+   - Starts aipets and shows at the end what it did.
 
-   Mehrmals ausführen schadet nicht: Was schon stimmt, bleibt unverändert. Von jeder geänderten Datei liegt die vorige Fassung als `<datei>.bak-aipets` daneben. Agents, die gerade laufen, einmal neu starten, damit sie die Hooks laden.
-2. **Bedienen:** Im Infobereich der Taskleiste (bei den ausgeblendeten Symbolen hinter `^`) erscheint das aipets-Icon.
-   - **Linksklick:** Einstellungen. Dort kannst du Pets ein- und ausblenden, mit zwei Reglern die Größe wählen und unter **„Klick öffnet“** zwischen **Programm**, **Desktop-App** und **Website** umschalten. Die Desktop-App gibt es bei Claude, Hermes, Astra, Cursor und Copilot.
-     - **„Größe aller Pets“:** die Höhe aller Pets in Pixeln, von 162 px bis zur Bildschirmhöhe. Die Striche stehen bei 162, 324, 486 … px. Verschiebst du ihn, springen **alle** Pets auf diese Höhe, auch die mit eigener Größe, und sind dann gleich hoch.
-     - **„Größe von <Pet>“:** eine eigene Höhe nur für dieses Pet, ebenfalls bis zur vollen Bildschirmhöhe. Sie bleibt, bis du den oberen Regler wieder bewegst. **„wie alle“** daneben setzt das Pet schon vorher auf die Höhe aller zurück.
-     - Es wird nichts mehr malgenommen. Kleiner als 162 px geht nicht, größer als der Bildschirm auch nicht. Steht ein Pet auf einem niedrigeren Bildschirm, wird es dort passend kleiner.
-     - Die Pets folgen beim Ziehen sofort. Die Pixel-Art wird nur gestreckt, nicht verändert.
-     - Programm: Programm, Argumente, Terminal und Arbeitsordner.
-     - Desktop-App: welche App gefunden wurde, mit Version und Ort. Mit „…“ wählst du stattdessen eine andere exe.
-       - Claude öffnet die Claude-App, Astra die Codex-App (Windows nennt sie „ChatGPT“), Hermes die Hermes-Desktop-App.
-       - Astra nimmt dafür `codex app`, ohne Terminalfenster. Das öffnet den Arbeitsordner als Workspace in der App (die Seite zeigt ihn deshalb an), und fehlt die App, öffnet es ihren Installer.
-       - Hermes Desktop muss einmal gebaut werden. Solange sie fehlt, startet ein Klick `hermes desktop` im Terminal. Das baut die App (beim ersten Mal einige Minuten) und öffnet sie, danach startet sie direkt.
-     - Website: der Link (nur http/https; `grok.com` wird automatisch zu `https://grok.com/`).
-     - Unten: „Mit Windows starten“. Das ist von Anfang an an: aipets schaltet es beim Start selbst ein, auch nach dem Verschieben des Ordners. Schaltest du es aus, bleibt es aus.
-     - Unten: **„Alle Pets ausblenden“** blendet alle Pets auf einmal aus, zum Beispiel beim Bildschirmteilen. Schaltest du es wieder aus, kommen genau die Pets zurück, die vorher zu sehen waren; einzeln ausgeblendete bleiben aus. Solange es an ist, ist „Anzeigen“ der einzelnen Pets ausgegraut. Es bleibt auch nach einem Neustart an.
-   - **Rechtsklick:** Menü mit allen Pets, „Alle Pets ausblenden“, Autostart und Beenden.
-3. **Entfernen:** **`uninstall.cmd` doppelklicken.** Es beendet aipets, schaltet „Mit Windows starten“ aus und nimmt die Hooks wieder heraus. Danach kannst du den Ordner löschen, und `%APPDATA%\aipets` (Einstellungen, Log) auch.
+   Running it several times does no harm: whatever is already right stays unchanged. For every changed file, the previous version is kept next to it as `<file>.bak-aipets`. Restart agents that are currently running once so they load the hooks.
+2. **Use:** The aipets icon appears in the taskbar's notification area (among the hidden icons behind `^`).
+   - **Left click:** settings. There you can show and hide pets, choose the size with two sliders and switch **"Click opens"** between **Program**, **Desktop app** and **Website**. The desktop app exists for Claude, Hermes, Astra, Cursor and Copilot.
+     - **"Size of all pets":** the height of all pets in pixels, from 162 px up to the screen height. The ticks sit at 162, 324, 486 … px. Moving it makes **all** pets jump to this height, including those with their own size, so they are all equally tall.
+     - **"Size of <pet>":** a height of its own for just this pet, also up to the full screen height. It stays until you move the upper slider again. **"like all"** next to it resets the pet to the height of all pets right away.
+     - Nothing is multiplied any more. Smaller than 162 px is not possible, taller than the screen neither. If a pet stands on a lower screen, it gets smaller to fit there.
+     - The pets follow immediately while dragging. The pixel art is only stretched, not altered.
+     - Program: program, arguments, terminal and working folder.
+     - Desktop app: which app was found, with version and location. With "…" you pick a different exe instead.
+       - Claude opens the Claude app, Astra the Codex app (Windows calls it "ChatGPT"), Hermes the Hermes desktop app.
+       - Astra uses `codex app` for this, without a terminal window. That opens the working folder as a workspace in the app (which is why the page shows it), and if the app is missing, it opens its installer.
+       - Hermes Desktop has to be built once. While it is missing, a click runs `hermes desktop` in the terminal. That builds the app (a few minutes the first time) and opens it; after that it starts directly.
+     - Website: the link (http/https only; `grok.com` automatically becomes `https://grok.com/`).
+     - At the bottom: "Start with Windows". It is on from the start: aipets turns it on by itself at startup, even after the folder was moved. If you turn it off, it stays off.
+     - At the bottom: **"Hide all pets"** hides all pets at once, for example while screen sharing. When you turn it off again, exactly the pets that were visible before come back; individually hidden ones stay hidden. While it is on, each pet's "Show" is greyed out. It stays on after a restart.
+   - **Right click:** menu with all pets, "Hide all pets", autostart and Quit.
+3. **Remove:** **Double-click `uninstall.cmd`.** It quits aipets, turns "Start with Windows" off and removes the hooks again. Afterwards you can delete the folder, and `%APPDATA%\aipets` (settings, log) as well.
 
-**Ordner verschoben oder einen Agent erst später installiert?** Die Einstellungen zeigen unter „Statusanzeige“, ob die Hooks zu dieser `aipets.exe` passen. Wenn nicht, trägt der Link **„Hooks einrichten“** darunter sie mit einem Klick neu ein. Nach dem Verschieben erledigt `install.cmd` im neuen Ordner alles auf einmal, auch den Autostart.
+**Moved the folder or installed an agent later?** The settings show under "Status display" whether the hooks match this `aipets.exe`. If not, the **"Set up hooks"** link below adds them again with one click. After moving, `install.cmd` in the new folder does everything at once, including the autostart.
 
-**Ohne Doppelklick:** `.\build.ps1` baut nur. `aipets.exe --install` und `aipets.exe --uninstall` machen dasselbe wie die beiden cmd-Dateien, mit `--quiet` ohne Fenster. Die exe muss neben dem Ordner `pets\` liegen.
+**Without double-clicking:** `.\build.ps1` only builds, `.\build.ps1 -Art` regenerates the app icon and sprites first (this needs Python with `numpy` and `Pillow`). `aipets.exe --install` and `aipets.exe --uninstall` do the same as the two cmd files, with `--quiet` without a window. The exe must sit next to the `pets\` folder.
 
-**Hintergrund:** Das Tray-Programm startet jedes Pet als eigenen Prozess (`aipets.exe --pet <id>`). Stürzt ein Pet ab oder wird es beendet, startet das Tray-Programm es neu. Beendest du das Tray-Programm, verschwinden auch die Pets.
+**Background:** The tray program starts each pet as its own process (`aipets.exe --pet <id>`). If a pet crashes or is ended, the tray program restarts it. If you quit the tray program, the pets disappear too.
 
-**Pet-Rechtsklick:** öffnen, Arbeitsordner (nur im Programm-Modus), „Klick öffnet“ → Programm / Desktop-App / Website, Größe (alle Pets auf 162 bis 648 px; nur dieses Pet: wie alle, kleiner, größer, so hoch wie der Bildschirm), zurück in die Ecke, ausblenden, Einstellungen, aipets beenden. Ein ausgeblendetes Pet bleibt aus, auch nach einem Neustart, bis du es in den Einstellungen oder im Tray-Menü wieder einschaltest.
+**Pet right-click:** open, working folder (program mode only), "Click opens" → Program / Desktop app / Website, Size (all pets at 162 to 648 px; only this pet: like all, smaller, bigger, as tall as the screen), back to the corner, hide, settings, quit aipets. A hidden pet stays hidden, even after a restart, until you turn it on again in the settings or the tray menu.
 
-**Überlappende Pets** liegen in fester Reihenfolge übereinander. **Ziehst du ein Pet mit der Maus, kommt es nach vorn und bleibt dort**, wie ein Fenster unter Windows. So stellst du die Reihenfolge selbst ein; aipets merkt sie sich auch über einen Neustart (`layers=` unter `[app]` in `%APPDATA%\aipets\settings.ini`, Zeile löschen = zurücksetzen). Solange du nichts gezogen hast, gilt die Reihenfolge der Liste (Einstellungen, Tray-Menü, `order=` in `pets\<id>\pet.ini`): Claude vorn, dann Hermes, Astra, Gemini, Grok, Cursor und Copilot. Menüs und Dialoge von aipets liegen immer über allen Pets. Schiebt sich ein anderes Programm mit „immer im Vordergrund“ davor, stehen die Pets nach spätestens gut drei Sekunden wieder darüber.
+**Overlapping pets** are stacked in a fixed order. **If you drag a pet with the mouse, it comes to the front and stays there**, like a window on Windows. This way you set the order yourself; aipets remembers it across restarts (`layers=` under `[app]` in `%APPDATA%\aipets\settings.ini`, delete the line to reset). As long as you have not dragged anything, the order of the list applies (settings, tray menu, `order=` in `pets\<id>\pet.ini`): Claude in front, then Hermes, Astra, Gemini, Grok, Cursor and Copilot. Menus and dialogs of aipets are always above all pets. If another program with "always on top" moves in front, the pets are back above it after a good three seconds at most.
 
-Ein Klick startet Claude Code mit `--dangerously-skip-permissions`, Hermes mit `--yolo` und Codex mit `--dangerously-bypass-approvals-and-sandbox`. Gemini öffnet `https://gemini.google.com/app`, Grok `https://grok.com/`, beide im Standardbrowser. Das alles kannst du in den Einstellungen oder in `pets\<id>\pet.ini` ändern. Gemini CLI und Grok CLI sind nicht dabei; wer den Programm-Modus will, muss sie selbst installieren.
+A click starts Claude Code with `--dangerously-skip-permissions`, Hermes with `--yolo` and Codex with `--dangerously-bypass-approvals-and-sandbox`. Gemini opens `https://gemini.google.com/app`, Grok `https://grok.com/`, both in the default browser. You can change all of this in the settings or in `pets\<id>\pet.ini`. Gemini CLI and Grok CLI are not included; if you want program mode, you have to install them yourself.
 
-Im Desktop-App-Modus startet das Pet die Claude-App und Hermes Desktop so wie das Startmenü. Die installierten Apps findet es selbst: Claude als App-Paket, Hermes Desktop im Ordner, in den `hermes desktop` sie baut. Die Codex-App öffnet `codex app`; ohne Codex CLI startet das Pet das App-Paket direkt. Die Statusanzeige der Codex-App kommt über dieselben Codex-Hooks. Ob die Claude-App und Hermes Desktop die Hooks auslösen, ist noch nicht ausprobiert.
+In desktop app mode, the pet starts the Claude app and Hermes Desktop the same way the Start menu does. It finds the installed apps by itself: Claude as an app package, Hermes Desktop in the folder `hermes desktop` builds it into. The Codex app is opened by `codex app`; without the Codex CLI the pet starts the app package directly. The Codex app's status comes through the same Codex hooks. Whether the Claude app and Hermes Desktop trigger the hooks has not been tried yet.
 
-## Hooks von Hand eintragen
+## Adding hooks by hand
 
-Brauchst du normalerweise nicht: `install.cmd` und „Hooks einrichten“ tragen genau das hier ein. Die Beispiele zeigen, was in den Dateien steht, falls du etwas prüfen oder anpassen willst.
+You normally don't need this: `install.cmd` and "Set up hooks" add exactly what is shown here. The examples show what goes into the files, in case you want to check or adjust something.
 
 ### Claude Code
 
-In `%USERPROFILE%\.claude\settings.json` eintragen und den Pfad anpassen. Danach einmal `/hooks` öffnen oder Claude Code neu starten.
+Add this to `%USERPROFILE%\.claude\settings.json` and adjust the path. Then open `/hooks` once or restart Claude Code.
 
 ```json
 "hooks": {
-  "UserPromptSubmit":   [{ "hooks": [{ "type": "command", "command": "C:\\Pfad\\zu\\aipets.exe", "args": ["--hook", "claude", "working"], "timeout": 10 }] }],
-  "PostToolUse":        [{ "matcher": "*", "hooks": [{ "type": "command", "command": "C:\\Pfad\\zu\\aipets.exe", "args": ["--hook", "claude", "resume"], "async": true }] }],
-  "PostToolUseFailure": [{ "matcher": "*", "hooks": [{ "type": "command", "command": "C:\\Pfad\\zu\\aipets.exe", "args": ["--hook", "claude", "resume"], "async": true }] }],
-  "Notification":       [{ "matcher": "permission_prompt|elicitation_dialog|elicitation_url_dialog|agent_needs_input", "hooks": [{ "type": "command", "command": "C:\\Pfad\\zu\\aipets.exe", "args": ["--hook", "claude", "waiting"], "timeout": 10 }] }],
-  "Stop":               [{ "hooks": [{ "type": "command", "command": "C:\\Pfad\\zu\\aipets.exe", "args": ["--hook", "claude", "done"], "timeout": 10 }] }],
-  "SessionEnd":         [{ "hooks": [{ "type": "command", "command": "C:\\Pfad\\zu\\aipets.exe", "args": ["--hook", "claude", "end"], "timeout": 10 }] }]
+  "UserPromptSubmit":   [{ "hooks": [{ "type": "command", "command": "C:\\path\\to\\aipets.exe", "args": ["--hook", "claude", "working"], "timeout": 10 }] }],
+  "PostToolUse":        [{ "matcher": "*", "hooks": [{ "type": "command", "command": "C:\\path\\to\\aipets.exe", "args": ["--hook", "claude", "resume"], "async": true }] }],
+  "PostToolUseFailure": [{ "matcher": "*", "hooks": [{ "type": "command", "command": "C:\\path\\to\\aipets.exe", "args": ["--hook", "claude", "resume"], "async": true }] }],
+  "Notification":       [{ "matcher": "permission_prompt|elicitation_dialog|elicitation_url_dialog|agent_needs_input", "hooks": [{ "type": "command", "command": "C:\\path\\to\\aipets.exe", "args": ["--hook", "claude", "waiting"], "timeout": 10 }] }],
+  "Stop":               [{ "hooks": [{ "type": "command", "command": "C:\\path\\to\\aipets.exe", "args": ["--hook", "claude", "done"], "timeout": 10 }] }],
+  "SessionEnd":         [{ "hooks": [{ "type": "command", "command": "C:\\path\\to\\aipets.exe", "args": ["--hook", "claude", "end"], "timeout": 10 }] }]
 }
 ```
 
 ### Hermes Agent
 
-In die `config.yaml` von Hermes eintragen. Sie liegt in `%HERMES_HOME%`, bei der Windows-Installation also meist in `%LOCALAPPDATA%\hermes`, sonst in `~/.hermes/`. Pfade in einfachen Anführungszeichen, sonst liest YAML die Backslashes als Escapes.
+Add this to Hermes' `config.yaml`. It lives in `%HERMES_HOME%`, which for the Windows install is usually `%LOCALAPPDATA%\hermes`, otherwise `~/.hermes/`. Put paths in single quotes, otherwise YAML reads the backslashes as escapes.
 
 ```yaml
 hooks:
   pre_llm_call:
-    - command: '"C:\Pfad\zu\aipets.exe" --hook hermes working'
+    - command: '"C:\path\to\aipets.exe" --hook hermes working'
       timeout: 10
   pre_approval_request:
-    - command: '"C:\Pfad\zu\aipets.exe" --hook hermes waiting'
+    - command: '"C:\path\to\aipets.exe" --hook hermes waiting'
       timeout: 10
   post_approval_response:
-    - command: '"C:\Pfad\zu\aipets.exe" --hook hermes resume'
+    - command: '"C:\path\to\aipets.exe" --hook hermes resume'
       timeout: 10
   on_session_end:
-    - command: '"C:\Pfad\zu\aipets.exe" --hook hermes done'
+    - command: '"C:\path\to\aipets.exe" --hook hermes done'
       timeout: 10
   on_session_finalize:
-    - command: '"C:\Pfad\zu\aipets.exe" --hook hermes end'
+    - command: '"C:\path\to\aipets.exe" --hook hermes end'
       timeout: 10
 ```
 
-Hermes fragt beim nächsten Start einmal pro Hook, ob er laufen darf. Alternativ startest du Hermes einmal mit `hermes --accept-hooks`. Prüfen kannst du das mit `hermes hooks list`.
+On its next start, Hermes asks once per hook whether it may run. Alternatively, start Hermes once with `hermes --accept-hooks`. You can check this with `hermes hooks list`.
 
 ### Codex
 
-In `%USERPROFILE%\.codex\hooks.json` eintragen (bzw. `%CODEX_HOME%\hooks.json`) und den Pfad anpassen. Codex startet Hook-Befehle unter Windows mit PowerShell, deshalb `& '…'` und `| Out-Null`: Ohne `Out-Null` wartet PowerShell nicht auf `aipets.exe`.
+Add this to `%USERPROFILE%\.codex\hooks.json` (or `%CODEX_HOME%\hooks.json`) and adjust the path. On Windows, Codex runs hook commands with PowerShell, hence `& '…'` and `| Out-Null`: without `Out-Null`, PowerShell does not wait for `aipets.exe`.
 
 ```json
 {
   "hooks": {
-    "UserPromptSubmit":  [{ "hooks": [{ "type": "command", "command": "& 'C:\\Pfad\\zu\\aipets.exe' --hook codex working | Out-Null", "timeout": 10, "async": true }] }],
-    "PermissionRequest": [{ "matcher": "*", "hooks": [{ "type": "command", "command": "& 'C:\\Pfad\\zu\\aipets.exe' --hook codex waiting | Out-Null", "timeout": 10, "async": true }] }],
-    "PostToolUse":       [{ "matcher": "*", "hooks": [{ "type": "command", "command": "& 'C:\\Pfad\\zu\\aipets.exe' --hook codex resume | Out-Null", "timeout": 10, "async": true }] }],
-    "Stop":              [{ "hooks": [{ "type": "command", "command": "& 'C:\\Pfad\\zu\\aipets.exe' --hook codex done | Out-Null", "timeout": 10, "async": true }] }],
-    "Interrupt":         [{ "hooks": [{ "type": "command", "command": "& 'C:\\Pfad\\zu\\aipets.exe' --hook codex idle | Out-Null", "timeout": 3, "async": true }] }],
-    "SessionEnd":        [{ "hooks": [{ "type": "command", "command": "& 'C:\\Pfad\\zu\\aipets.exe' --hook codex end | Out-Null", "timeout": 3 }] }]
+    "UserPromptSubmit":  [{ "hooks": [{ "type": "command", "command": "& 'C:\\path\\to\\aipets.exe' --hook codex working | Out-Null", "timeout": 10, "async": true }] }],
+    "PermissionRequest": [{ "matcher": "*", "hooks": [{ "type": "command", "command": "& 'C:\\path\\to\\aipets.exe' --hook codex waiting | Out-Null", "timeout": 10, "async": true }] }],
+    "PostToolUse":       [{ "matcher": "*", "hooks": [{ "type": "command", "command": "& 'C:\\path\\to\\aipets.exe' --hook codex resume | Out-Null", "timeout": 10, "async": true }] }],
+    "Stop":              [{ "hooks": [{ "type": "command", "command": "& 'C:\\path\\to\\aipets.exe' --hook codex done | Out-Null", "timeout": 10, "async": true }] }],
+    "Interrupt":         [{ "hooks": [{ "type": "command", "command": "& 'C:\\path\\to\\aipets.exe' --hook codex idle | Out-Null", "timeout": 3, "async": true }] }],
+    "SessionEnd":        [{ "hooks": [{ "type": "command", "command": "& 'C:\\path\\to\\aipets.exe' --hook codex end | Out-Null", "timeout": 3 }] }]
   }
 }
 ```
 
-Codex führt neue Hooks erst aus, wenn du sie freigegeben hast: In Codex `/hooks` öffnen und die sechs aipets-Hooks als vertrauenswürdig markieren. Änderst du einen Befehl (z. B. weil die exe woanders liegt), fragt Codex erneut.
+Codex only runs new hooks once you have approved them: open `/hooks` in Codex and mark the six aipets hooks as trusted. If you change a command (e.g. because the exe moved), Codex asks again.
 
 ### Cursor
 
-In `%USERPROFILE%\.cursor\hooks.json` eintragen und den Pfad anpassen. Cursor startet Hook-Befehle unter Windows über PowerShell und gibt das Ereignis in den Daten mit, die der Hook bekommt. Deshalb steht hier nur der Pfad, ohne Argumente. Enthält er Leerzeichen, kommt er in einfache Anführungszeichen, etwa `"command": "'C:\\Program Files\\aipets\\aipets.exe'"`.
+Add this to `%USERPROFILE%\.cursor\hooks.json` and adjust the path. On Windows, Cursor runs hook commands through PowerShell and passes the event in the data the hook receives. That is why only the path is given here, without arguments. If it contains spaces, put it in single quotes, e.g. `"command": "'C:\\Program Files\\aipets\\aipets.exe'"`.
 
 ```json
 {
   "version": 1,
   "hooks": {
-    "beforeSubmitPrompt": [{ "command": "C:\\Pfad\\zu\\aipets.exe", "timeout": 10 }],
-    "stop":               [{ "command": "C:\\Pfad\\zu\\aipets.exe", "timeout": 10 }],
-    "sessionEnd":         [{ "command": "C:\\Pfad\\zu\\aipets.exe", "timeout": 10 }]
+    "beforeSubmitPrompt": [{ "command": "C:\\path\\to\\aipets.exe", "timeout": 10 }],
+    "stop":               [{ "command": "C:\\path\\to\\aipets.exe", "timeout": 10 }],
+    "sessionEnd":         [{ "command": "C:\\path\\to\\aipets.exe", "timeout": 10 }]
   }
 }
 ```
 
-Cursor übernimmt außerdem von sich aus die Hooks aus Claude Code (Cursor-Einstellung „Include Third-Party Plugins, Skills, and Other Configs“), allerdings ohne deren Argumente. aipets erkennt diese Aufrufe und zeigt sie bei Cursor an, statt sich selbst zu öffnen. Steht in beiden Dateien derselbe Befehl, führt Cursor ihn nur einmal aus. Jeder Hook startet unter Windows eine PowerShell und kostet etwa eine halbe Sekunde, auf die Cursor wartet. aipets trägt für Cursor deshalb keinen Hook nach jedem Tool-Aufruf ein; der übernommene `PostToolUse`-Hook aus Claude Code läuft aber mit, solange die Übernahme in Cursor an ist. Welche Hooks Cursor ausführt, steht in Cursor im Ausgabekanal „Hooks“.
+Cursor also picks up the hooks from Claude Code by itself (Cursor setting "Include Third-Party Plugins, Skills, and Other Configs"), but without their arguments. aipets recognizes these calls and shows them on Cursor instead of opening itself. If both files contain the same command, Cursor runs it only once. On Windows, every hook starts a PowerShell and costs about half a second, which Cursor waits for. That is why aipets adds no hook after every tool call for Cursor; the imported `PostToolUse` hook from Claude Code still runs as long as importing is on in Cursor. Which hooks Cursor runs is shown in Cursor's "Hooks" output channel.
 
-## Selbst bauen
+## Building it yourself
 
 ```powershell
-.\build.ps1                         # bauen, danach laufende Pets neu starten
-.\build.ps1 -OutputDirectory C:\Temp\aipets-build  # bauen ohne laufende Pets anzufassen
+.\build.ps1                         # build, then restart running pets
+.\build.ps1 -OutputDirectory C:\Temp\aipets-build  # build without touching running pets
 ```
 
-`-OutputDirectory` enthält nur die exe; zum Ausführen muss daneben `pets\` liegen. Die Versionsnummer steht in `src/AssemblyInfo.cs`. Die exe ist nicht signiert.
+With `-OutputDirectory`, the output contains only the exe; to run it, `pets\` must sit next to it. The version number is in `src/AssemblyInfo.cs`. The exe is not signed.
 
-## Bekannte Grenzen
+## Known limitations
 
-- Gemini und Grok zeigen im Website-Modus keinen Arbeitsstatus.
-- Cursor meldet nicht, wann es auf deine Bestätigung wartet: Das „?“ fehlt bei Cursor. Die Cursor-Hooks folgen der öffentlichen Doku und dem Verhalten von Cursor 3.5 und sind noch nicht in einer echten Cursor-Sitzung erprobt.
-- Bei abgebrochenen Codex-Turns ohne Abschluss-Hook kann der Spinner bis zum Timeout von 15 Minuten bleiben.
-- Die Status-Hooks der Claude-Desktop-App und Hermes Desktop sowie das Verhalten auf mehreren Monitoren müssen noch manuell geprüft werden.
-- Der YAML-Editor unterstützt eingerückte Hook-Listen, leere Blöcke und Kommentare. Kompakte nichtleere Inline-Hook-Listen oder doppelte Hook-Schlüssel werden mit einer Fehlermeldung abgelehnt; die Datei bleibt erhalten.
+- Gemini and Grok show no working status in website mode.
+- Cursor does not report when it is waiting for your confirmation: the "?" is missing for Cursor. The Cursor hooks follow the public docs and the behavior of Cursor 3.5 and have not been tried in a real Cursor session yet.
+- For aborted Codex turns without a closing hook, the spinner can stay until the 15-minute timeout.
+- The status hooks of the Claude desktop app and Hermes Desktop, as well as the behavior on multiple monitors, still need to be checked by hand.
+- The YAML editor supports indented hook lists, empty blocks and comments. Compact non-empty inline hook lists or duplicate hook keys are rejected with an error message; the file is left intact.
 
-## Lizenz
+## License
 
-Der Quellcode steht unter der [MIT-Lizenz](LICENSE). Die Pet-Grafiken in `pets/*/sprites/` sowie Namen und Logos von Anthropic, OpenAI, Google, xAI, Nous Research und Anysphere (Cursor) fallen nicht darunter. aipets ist ein inoffizielles Fan-Projekt und steht in keiner Verbindung zu diesen Anbietern.
+The source code is under the [MIT License](LICENSE). The pet graphics in `pets/*/sprites/` as well as names and logos of Anthropic, OpenAI, Google, xAI, Nous Research, Anysphere (Cursor) and Microsoft are not covered by it. aipets is an unofficial fan project and is not affiliated with these companies.

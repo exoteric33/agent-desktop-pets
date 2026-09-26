@@ -89,7 +89,7 @@ namespace AiPets
             pet.Id = Path.GetFileName(dir).ToLowerInvariant();
             pet.Dir = dir;
             pet.Name = ini.Get("pet", "name") ?? pet.Id;
-            pet.OpenText = ini.Get("pet", "open") ?? pet.Name + " öffnen";
+            pet.OpenText = ini.Get("pet", "open") ?? "Open " + pet.Name;
             pet.Order = ini.GetInt("pet", "order", 100);
             pet.Home = ini.GetInt("pet", "home", 12);
             pet.Program = ini.Get("pet", "program") ?? "";
@@ -116,7 +116,7 @@ namespace AiPets
         public const int HeightUnit = 162, MinHeight = HeightUnit;
 
         public bool Enabled;        // the pet's own choice ([id] enabled)
-        public bool AllHidden;      // "Alle Pets ausblenden" ([app] hidden=1); Enabled stays as it was
+        public bool AllHidden;      // "Hide all pets" ([app] hidden=1); Enabled stays as it was
         public int Height;          // height of all pets in screen pixels ([app] height); 0 = from the display DPI
         public int OwnHeight;       // this pet's own height ([id] height); 0 = the one of all pets
         public bool HasPosition;
@@ -171,7 +171,7 @@ namespace AiPets
             return s;
         }
 
-        /// <summary>All pets are hidden at once; each pet's own "Anzeigen" comes back when this is off again.</summary>
+        /// <summary>All pets are hidden at once; each pet's own "Show" comes back when this is off again.</summary>
         public static bool HidesAll(Ini ini)
         {
             return ini.Get("app", "hidden") == "1";
