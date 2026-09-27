@@ -51,7 +51,7 @@ namespace AiPets
             string status = Option(args, "--status");
             if (status != null)
             {
-                var monitor = new StatusMonitor(status);
+                var monitor = new StatusMonitor(status, false);
                 monitor.Scan();
                 Console.WriteLine(monitor.State + (monitor.LatestDone > 0 ? " (last done " + monitor.LatestDone + ")" : ""));
                 return 0;

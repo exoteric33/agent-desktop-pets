@@ -421,20 +421,20 @@ namespace AiPets
     sealed class StatusMonitor
     {
         const int TailBytes = 16 * 1024;
-        const int CodexTailBytes = 512 * 1024;   // Codex rollout lines reach tens of KB (encrypted reasoning)
 
         readonly string folder;
-        readonly bool claudeTranscripts, codex, transcripts;
+        readonly bool claudeTranscripts, codex, transcripts, backgroundTranscripts;
         readonly long staleMs;
         readonly Dictionary<string, long> checkedTranscripts = new Dictionary<string, long>();
-        readonly Dictionary<string, bool> codexQuestions = new Dictionary<string, bool>();
+        readonly Dictionary<string, CodexQuestions> codexQuestions = new Dictionary<string, CodexQuestions>();
 
         public AgentState State { get; private set; }
         public long LatestDone { get; private set; }
 
-        public StatusMonitor(string source)
+        public StatusMonitor(string source, bool backgroundTranscripts = true)
         {
             folder = StatusEntry.Folder(source);
+            this.backgroundTranscripts = backgroundTranscripts;
             claudeTranscripts = source == "claude";
             codex = source == "codex";
             transcripts = claudeTranscripts || codex || source == "cursor";   // Extra holds the transcript path
@@ -467,7 +467,8 @@ namespace AiPets
                     TryDelete(path);
                     continue;
                 }
-                if (codex && CodexAsks(s.Extra))
+                bool questionsCurrent = true;
+                if (codex && CodexAsks(s, out questionsCurrent))
                 {
                     // a question stays open through Stop and, after the async variant, while Codex keeps working
                     waiting = true;
@@ -490,7 +491,8 @@ namespace AiPets
                 }
                 if (s.State == AgentState.Working) working = true;
                 else if (s.State == AgentState.Waiting) waiting = true;
-                else if (s.State == AgentState.Done) latestDone = Math.Max(latestDone, s.Time);
+                // Do not flash a completion before a newly queued question read has caught up to this hook.
+                else if (s.State == AgentState.Done && questionsCurrent) latestDone = Math.Max(latestDone, s.Time);
             }
             State = waiting ? AgentState.Waiting : working ? AgentState.Working : AgentState.Idle;
             LatestDone = latestDone;
@@ -545,57 +547,124 @@ namespace AiPets
         /// fires either. So the rollout transcript decides: request_user_input (Plan mode) is open until its
         /// function_call_output, request_user_input_async returns at once and is open until the next turn starts.
         /// </summary>
-        bool CodexAsks(string transcript)
+        bool CodexAsks(StatusEntry status, out bool current)
         {
-            long written = TranscriptTime(transcript);
-            if (written == 0)
+            current = true;
+            string transcript = status.Extra;
+            if (string.IsNullOrEmpty(transcript))
                 return false;
-            bool asks;
-            if (codexQuestions.TryGetValue(transcript, out asks) && checkedTranscripts.ContainsKey(transcript)
-                && checkedTranscripts[transcript] == written)
-                return asks;
-            asks = false;
-            try
+            CodexQuestions questions;
+            if (!codexQuestions.TryGetValue(transcript, out questions))
             {
-                string tail;
-                using (var fs = new FileStream(transcript, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
-                {
-                    fs.Seek(Math.Max(0, fs.Length - CodexTailBytes), SeekOrigin.Begin);
-                    using (var reader = new StreamReader(fs, Encoding.UTF8))
-                        tail = reader.ReadToEnd();
-                }
-                asks = CodexAsks(tail.Split('\n'));
+                questions = new CodexQuestions();
+                codexQuestions[transcript] = questions;
             }
-            catch (IOException) { }
-            catch (UnauthorizedAccessException) { }
-            checkedTranscripts[transcript] = written;
-            codexQuestions[transcript] = asks;
-            return asks;
+            CodexQuestionResult result = questions.Poll(transcript, status.Time, backgroundTranscripts);
+            current = result.HookTime >= status.Time;
+            return result.Asks;
         }
 
-        /// <summary>Rollout lines, oldest first (line 0 may be cut off): is a question from the current turn open?</summary>
-        internal static bool CodexAsks(string[] lines)
+        sealed class CodexQuestionResult
         {
-            var answered = new HashSet<string>();
-            for (int i = lines.Length - 1; i > 0; i--)
+            public readonly bool Asks;
+            public readonly long HookTime;
+
+            public CodexQuestionResult(bool asks, long hookTime) { Asks = asks; HookTime = hookTime; }
+        }
+
+        /// <summary>Reads each rollout byte once, off the animation thread, and remembers open questions.</summary>
+        sealed class CodexQuestions
+        {
+            readonly HashSet<string> pending = new HashSet<string>();
+            readonly byte[] buffer = new byte[16 * 1024];
+            MemoryStream line = new MemoryStream();
+            long offset, written;
+            bool asyncQuestion;
+            volatile CodexQuestionResult result = new CodexQuestionResult(false, 0);
+            int reading;
+
+            public CodexQuestionResult Poll(string transcript, long hookTime, bool background)
             {
-                string line = lines[i];
-                if (line.Contains("\"type\":\"task_started\""))
-                    return false;
-                string callId = Regex.Match(line, "\"call_id\":\"([^\"]+)\"").Groups[1].Value;
-                if (line.Contains("\"type\":\"function_call_output\""))
+                if (Interlocked.CompareExchange(ref reading, 1, 0) == 0)
                 {
-                    answered.Add(callId);
-                    continue;
+                    WaitCallback read = delegate
+                    {
+                        try { Read(transcript, hookTime); }
+                        catch (IOException) { }
+                        catch (UnauthorizedAccessException) { }
+                        catch (ArgumentException) { }
+                        catch (NotSupportedException) { }
+                        finally { Interlocked.Exchange(ref reading, 0); }
+                    };
+                    if (background) ThreadPool.QueueUserWorkItem(read);
+                    else read(null);   // --status diagnostics need the result before exiting
                 }
-                if (!line.Contains("\"type\":\"function_call\""))
-                    continue;
-                if (line.Contains("\"name\":\"request_user_input_async\""))
-                    return true;
-                if (line.Contains("\"name\":\"request_user_input\"") && !answered.Contains(callId))
-                    return true;
+                return result;
             }
-            return false;
+
+            void Read(string transcript, long hookTime)
+            {
+                long stamp;
+                using (var fs = new FileStream(transcript, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                {
+                    long length = fs.Length;   // one snapshot; do not chase a continuously growing rollout
+                    stamp = File.GetLastWriteTimeUtc(transcript).Ticks;
+                    if (length < offset || (length == offset && written != 0 && stamp != written))
+                    {
+                        offset = 0;
+                        line.SetLength(0);
+                        pending.Clear();
+                        asyncQuestion = false;
+                    }
+                    fs.Seek(offset, SeekOrigin.Begin);
+                    while (offset < length)
+                    {
+                        int count = fs.Read(buffer, 0, (int)Math.Min(buffer.Length, length - offset));
+                        if (count == 0) return;   // truncated during the read: retry, retaining the published state
+                        int start = 0;
+                        for (int i = 0; i < count; i++)
+                        {
+                            if (buffer[i] != '\n') continue;
+                            line.Write(buffer, start, i - start);
+                            ApplyLine(Encoding.UTF8.GetString(line.GetBuffer(), 0, (int)line.Length));
+                            line.SetLength(0);
+                            if (line.Capacity > buffer.Length) line = new MemoryStream();
+                            start = i + 1;
+                        }
+                        // Keep an unfinished record as bytes, including any split UTF-8 character.
+                        line.Write(buffer, start, count - start);
+                        offset += count;   // only successfully read bytes are committed; failures retry here
+                    }
+                }
+                written = stamp;
+                // Publish together, only after catching up: no historic questions or premature completion.
+                result = new CodexQuestionResult(asyncQuestion || pending.Count > 0, hookTime);
+            }
+
+            void ApplyLine(string text)
+            {
+                if (text.Contains("\"type\":\"task_started\""))
+                {
+                    pending.Clear();
+                    asyncQuestion = false;
+                }
+                else if (text.Contains("\"type\":\"function_call_output\""))
+                {
+                    if (pending.Count > 0) pending.Remove(CallId(text));
+                }
+                else if (text.Contains("\"type\":\"function_call\""))
+                {
+                    if (text.Contains("\"name\":\"request_user_input_async\""))
+                        asyncQuestion = true;
+                    else if (text.Contains("\"name\":\"request_user_input\""))
+                        pending.Add(CallId(text));
+                }
+            }
+
+            static string CallId(string text)
+            {
+                return Regex.Match(text, "\"call_id\":\"([^\"]+)\"").Groups[1].Value;
+            }
         }
 
         static void TryDelete(string path)

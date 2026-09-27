@@ -123,7 +123,7 @@ Add this to `%USERPROFILE%\.codex\hooks.json` (or `%CODEX_HOME%\hooks.json`) and
 
 Codex only runs new hooks once you have approved them: open `/hooks` in Codex and mark the six aipets hooks as trusted. If you change a command (e.g. because the exe moved), Codex asks again.
 
-The "?" for Codex questions needs no hook: Codex fires none for its question tools, so Astra reads the session transcript instead and shows "?" until you answer.
+The "?" for Codex questions needs no hook: Codex fires none for its question tools, so Astra reads the session transcript instead and shows "?" until you answer. Transcript updates are read incrementally in the background, keeping questions visible during long sessions and retrying if the file is temporarily locked.
 
 ### Cursor
 
