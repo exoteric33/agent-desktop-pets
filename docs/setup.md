@@ -6,11 +6,11 @@
 
 Use Windows 10/11 with .NET Framework 4.8. Windows Terminal is optional; aipets falls back to the Windows console. The AI programs and desktop apps must be installed separately.
 
-1. Download the [current source ZIP](https://github.com/exoteric33/agent-desktop-pets/archive/refs/heads/main.zip), or clone the repository:
+1. Download the [current source ZIP](https://github.com/exoteric33/aipets/archive/refs/heads/main.zip), or clone the repository:
 
    ```powershell
-   git clone https://github.com/exoteric33/agent-desktop-pets.git
-   cd agent-desktop-pets
+   git clone https://github.com/exoteric33/aipets.git
+   cd aipets
    ```
 
 2. Put the extracted or cloned folder where you want to keep it. Startup and hooks store the path to `aipets.exe`.

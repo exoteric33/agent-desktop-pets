@@ -36,7 +36,7 @@ Real desktop screenshots with Claude and Astra:
 
 **You need:** Windows 10/11 with .NET Framework 4.8. Windows Terminal is optional. Install the AI tools you want to launch separately; aipets does not include them.
 
-1. [Download the latest source ZIP](https://github.com/exoteric33/agent-desktop-pets/archive/refs/heads/main.zip) and extract it into a folder you intend to keep. You can also clone this repository.
+1. [Download the latest source ZIP](https://github.com/exoteric33/aipets/archive/refs/heads/main.zip) and extract it into a folder you intend to keep. You can also clone this repository.
 2. Double-click **`install.cmd`**. It builds the app, enables **Start with Windows**, adds status hooks for detected agents and starts the pets. No Python or separate .NET SDK is needed.
 3. Click the **aipets tray icon** (check the hidden icons behind **^**) to choose which pets to show, their size and what a click opens.
 4. Restart any running agents so they load the new hooks. If setup reports that Codex hooks need approval, follow its `/hooks` instructions.
