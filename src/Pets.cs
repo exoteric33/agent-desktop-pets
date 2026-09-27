@@ -14,7 +14,7 @@ namespace AiPets
     {
         public string Id, Dir, Name, OpenText;
         public int Order, Home;
-        public string Program, Find, Args, Shell;
+        public string Program, Find, Args, BypassArgs, Shell;
         public string Url;          // the pet's website, opened in the default browser in website mode
         public string DesktopApp;   // app mode: app ids and exe paths, ';'-separated (see DesktopApp.Find)
         public string AppCommand;   // app mode: the program with these arguments opens the app ("codex app"), without a window
@@ -35,6 +35,28 @@ namespace AiPets
         public bool HasSprites
         {
             get { return File.Exists(Path.Combine(SpritesDir, "atlas.png")) && File.Exists(Path.Combine(SpritesDir, "atlas.txt")); }
+        }
+
+        /// <summary>The optional bypass preset only applies to the CLI named in this pet's defaults.</summary>
+        public string BypassArguments(string program)
+        {
+            string expected = ProgramIdentity(Program);
+            return expected.Length > 0 && string.Equals(expected, ProgramIdentity(program), StringComparison.OrdinalIgnoreCase)
+                ? BypassArgs ?? "" : "";
+        }
+
+        static string ProgramIdentity(string program)
+        {
+            string name = (program ?? "").Trim();
+            if (name.Length >= 2 && ((name[0] == '"' && name[name.Length - 1] == '"')
+                || (name[0] == '\'' && name[name.Length - 1] == '\'')))
+                name = name.Substring(1, name.Length - 2);
+            name = name.Replace('/', '\\');
+            name = name.Substring(name.LastIndexOf('\\') + 1);
+            foreach (string extension in new[] { ".exe", ".cmd", ".bat" })
+                if (name.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
+                    return name.Substring(0, name.Length - extension.Length);
+            return name;
         }
 
         public static List<PetInfo> Discover()
@@ -84,6 +106,7 @@ namespace AiPets
             pet.Program = ini.Get("pet", "program") ?? "";
             pet.Find = ini.Get("pet", "find") ?? "";
             pet.Args = ini.Get("pet", "args") ?? "";
+            pet.BypassArgs = ini.Get("pet", "bypassargs") ?? "";
             pet.Shell = ini.Get("pet", "shell") ?? "direct";
             pet.Url = ini.Get("pet", "url") ?? "";
             pet.DesktopApp = ini.Get("pet", "app") ?? "";
@@ -165,12 +188,10 @@ namespace AiPets
             return ini.Get("app", "hidden") == "1";
         }
 
-        /// <summary>Switches the mode; app mode needs an app to look for, otherwise it is program mode.</summary>
+        /// <summary>Switches the mode; every pet can use a custom desktop app.</summary>
         public void UseMode(string mode)
         {
             Mode = CheckedMode(mode);
-            if (Mode == "app" && DesktopApp.Length == 0)
-                Mode = "program";
         }
 
         /// <summary>"website", "app" or "program" (anything unknown).</summary>

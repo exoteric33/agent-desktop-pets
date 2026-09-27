@@ -25,33 +25,39 @@ The current `main` branch contains features added after the `v0.1.0-rc.1` binary
 
 ## Choose what a click opens
 
-Open settings with a left-click on the aipets tray icon. Select a pet, then choose **Click opens**. The same choices appear in the pet's right-click menu.
+Open settings with a left-click on the aipets tray icon. Select a pet, then choose **Click opens**. Every pet has the same choices in the same order, also in its right-click menu. All seven pets default to **Website**.
 
 | Mode | Configuration |
 | --- | --- |
-| **Program** | Program, arguments, terminal and working folder. Windows Terminal is used when available. |
-| **Desktop app** | Available for Claude, Hermes, Astra, Cursor and Copilot. aipets detects supported installations; use **…** to choose a different executable. |
 | **Website** | An HTTP or HTTPS address in your default browser. A bare domain such as `grok.com` becomes `https://grok.com/`. |
+| **Desktop app** | Available for every pet; use **…** to choose an executable. Presets detect supported Claude, Hermes, Astra, Cursor and Copilot installations. |
+| **Program** | Program, CLI arguments preset, editable arguments, terminal and working folder. Windows Terminal is used when available. |
 
 - **Astra:** app mode uses `codex app` in the chosen working folder, without opening a terminal. If the CLI is unavailable, it tries the installed app package directly. Website mode opens `https://chatgpt.com/` by default.
 - **Hermes:** if Hermes Desktop has not been built, app mode starts `hermes desktop` in a terminal. The first build can take several minutes; later clicks start the built app directly.
 - **Cursor:** the program preset is the `cursor` editor command.
 - **Copilot:** the app preset is Microsoft Copilot. Program mode is available for your own command; it has no preset command.
-- **Gemini and Grok:** their default is the website. Program mode has `gemini` and `grok` presets; install and configure the intended CLI yourself. The Grok preset has not been verified against a real CLI installation.
+- **Gemini and Grok:** Program mode has `gemini` and `grok` presets; install and configure the intended CLI yourself. Desktop app mode lets you choose your own executable. The Grok preset has not been verified against a real CLI installation.
 
 Changing the launch mode does not add a status integration. Status always comes from the sources listed in the [README](../README.md#supported-pets).
 
 ### Terminal arguments
 
-The shipped program presets use these arguments:
+In **Program** mode, **CLI arguments** defaults to **Standard (no arguments)**. aipets adds no CLI arguments; the tool's own saved configuration still applies.
 
-| Pet | Default command |
-| --- | --- |
-| Claude | `claude --dangerously-skip-permissions` |
-| Hermes | `hermes --yolo` |
-| Astra | `codex --dangerously-bypass-approvals-and-sandbox` |
+| Pet | Standard command | Optional **Bypass permissions** arguments |
+| --- | --- | --- |
+| Claude | `claude` | `--dangerously-skip-permissions` |
+| Hermes | `hermes` | `--yolo` |
+| Astra | `codex` | `--dangerously-bypass-approvals-and-sandbox` |
+| Gemini | `gemini` | `--yolo` |
+| Grok | `grok` | No preset |
+| Cursor | `cursor` (editor command) | No preset |
+| Copilot | Your own command; no default CLI | No preset |
 
-These flags bypass the agents' usual permission prompts; the Codex flag also disables its sandbox. To use the tools' normal defaults, choose **Program** mode in settings and remove the flag from **Arguments** before launching.
+**Bypass permissions** is optional and appears only for the matching supported CLI. It skips that tool's permission prompts; the Codex preset also disables its sandbox. Gemini documents its `--yolo` option in the [CLI configuration reference](https://geminicli.com/docs/reference/configuration/).
+
+Choose **Custom arguments** to edit **Arguments** yourself. Existing custom arguments are preserved, and the arguments field remains editable. Choosing Standard clears the arguments; choosing Bypass replaces them with the preset. Changing to an unrelated program clears a recognized bypass preset and preserves custom arguments.
 
 ## Size and visibility
 

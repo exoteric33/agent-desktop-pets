@@ -1001,7 +1001,7 @@ namespace AiPets
             var openProgram = new ToolStripMenuItem("Program", null, delegate { SetMode("program"); });
             var openApp = new ToolStripMenuItem("Desktop app", null, delegate { SetMode("app"); });
             var openWebsite = new ToolStripMenuItem("Website", null, delegate { SetMode("website"); });
-            opens.DropDownItems.AddRange(new ToolStripItem[] { openProgram, openApp, openWebsite });
+            opens.DropDownItems.AddRange(new ToolStripItem[] { openWebsite, openApp, openProgram });
             // heights of all pets (Tag = px), then this pet's own, each group under a grey heading
             var sizes = new ToolStripMenuItem("Size");
             var shared = new List<ToolStripMenuItem>();
@@ -1053,7 +1053,6 @@ namespace AiPets
                 openApp.Checked = s.OpensApp;
                 openWebsite.Checked = s.OpensWebsite;
                 openProgram.ToolTipText = s.Program;
-                openApp.Visible = s.DesktopApp.Length > 0;   // only pets that know a desktop app
                 openApp.ToolTipText = AppText(s);
                 openWebsite.ToolTipText = s.Url;
                 foreach (ToolStripMenuItem entry in shared)

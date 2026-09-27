@@ -2,7 +2,7 @@
 
 **Animated desktop companions for your AI tools on Windows.**
 
-Keep your favorite AI tools just above your taskbar as little characters. Click a pet to open its terminal, desktop app or website. Supported agents also show when they are **working**, **need your input** or **have finished**.
+Keep your favorite AI tools just above your taskbar as little characters. Click a pet to open its website, desktop app or terminal. Supported agents also show when they are **working**, **need your input** or **have finished**.
 
 ![The seven aipets characters: Claude, Hermes, Astra, Gemini, Grok, Cursor and Copilot](docs/images/pets.png)
 
@@ -13,7 +13,7 @@ All seven pets use animated pixel art.
 ## What it can do
 
 - **Show agent activity:** a spinner while working, **?** when input is needed, and **✓** when finished, depending on the integration.
-- **Open your tools:** choose a program, supported desktop app or website, with your own command, link and working folder.
+- **Open your tools:** every pet has the same Website, Desktop app and Program choices, with your own link, executable, command and working folder.
 - **Make the desktop yours:** drag, hide and resize pets from 162 pixels up to screen height. Positions and sizes are remembered; dragging a pet brings it to the front.
 - **Stay out of the way:** hide all pets at once for screen sharing. They also hide automatically for fullscreen apps.
 - **React and animate:** blinking, hover and click reactions, and sleeping while you are away. Manage everything from the tray icon or a pet's right-click menu.
@@ -43,21 +43,21 @@ Real desktop screenshots with Claude and Astra:
 
 Use the source ZIP for the features shown here; the existing `v0.1.0-rc.1` binary release is older.
 
-**Terminal defaults:** Claude, Hermes and Codex launch with permission-bypass arguments. You can change these under **Settings → Arguments**; the [setup guide](docs/setup.md#terminal-arguments) lists the exact defaults.
+**Defaults:** every pet opens its website. Program mode starts without extra arguments and uses the CLI's own saved configuration. The **CLI arguments** dropdown offers **Standard (no arguments)**, optional **Bypass permissions** for supported CLIs, and **Custom arguments**. See the [setup guide](docs/setup.md#terminal-arguments).
 
 ## Supported pets
 
 | Pet | Default click opens | Live status |
 | --- | --- | --- |
-| **Claude** | Claude Code in a terminal | Working, waiting, done |
-| **Hermes** | Hermes Agent in PowerShell | Working, approval waiting, done |
-| **Astra (Codex)** | Codex CLI in a terminal | Working, waiting, done; also supports Codex desktop sessions |
+| **Claude** | Claude website | Working, waiting, done |
+| **Hermes** | Hermes Agent website | Working, approval waiting, done |
+| **Astra (Codex)** | ChatGPT website | Working, waiting, done; also supports Codex desktop sessions |
 | **Gemini** | Gemini website | No integration |
 | **Grok** | Grok website | No integration |
-| **Cursor** | Cursor desktop app | Working and done |
-| **Copilot** | Microsoft Copilot desktop app | No integration |
+| **Cursor** | Cursor website | Working and done |
+| **Copilot** | Microsoft Copilot website | No integration |
 
-Switch **Click opens** in settings or the pet's right-click menu. Desktop app presets are available for Claude, Hermes, Astra, Cursor and Copilot; every pet supports a website or custom program. Astra's website is **chatgpt.com**. Copilot is **Microsoft Copilot**.
+Switch **Click opens** in settings or the pet's right-click menu: **Website → Desktop app → Program**. Every pet supports a custom desktop executable as well as a website or program. Desktop app presets are available for Claude, Hermes, Astra, Cursor and Copilot. Astra's website is **chatgpt.com**. Copilot is **Microsoft Copilot**.
 
 Status depends on the agent's hooks, independently of the chosen click action. Opening a website does not let aipets read that chat's status. Clicking a waiting pet opens the configured tool; it does not select the specific waiting conversation.
 

@@ -40,7 +40,7 @@ namespace AiPets
         bool ownHeight;                  // the shown pet has her own height
         readonly RadioButton programMode = new RadioButton(), appMode = new RadioButton(), websiteMode = new RadioButton();
         readonly TextBox programBox = new TextBox(), argsBox = new TextBox(), dirBox = new TextBox(), urlBox = new TextBox();
-        readonly ComboBox shellBox = new ComboBox();
+        readonly ComboBox shellBox = new ComboBox(), argsPresetBox = new ComboBox();
         readonly Button openButton = new Button(), homeButton = new Button();
         // "Click opens: Program" shows program, arguments, terminal and folder; "Desktop app" the app
         // (and the folder, if the program opens the app: codex app); "Website" only the link
@@ -72,7 +72,7 @@ namespace AiPets
             AutoScaleMode = AutoScaleMode.Dpi;
             Font = new Font("Segoe UI", 9F);
             Text = "aipets – Settings";
-            ClientSize = new Size(700, 540);
+            ClientSize = new Size(700, 574);
             FormBorderStyle = FormBorderStyle.FixedSingle;
             MaximizeBox = false;
             StartPosition = FormStartPosition.CenterScreen;
@@ -240,11 +240,10 @@ namespace AiPets
             programMode.Text = "Program";
             appMode.Text = "Desktop app";
             websiteMode.Text = "Website";
-            // ShowPet puts "Website" behind "Desktop app", or in its place for pets without an app
-            programMode.Location = new Point(4, 3);
+            websiteMode.Location = new Point(4, 3);
             appMode.Location = new Point(112, 3);
-            websiteMode.Location = new Point(232, 3);
-            foreach (RadioButton radio in new[] { programMode, appMode, websiteMode })
+            programMode.Location = new Point(244, 3);
+            foreach (RadioButton radio in new[] { websiteMode, appMode, programMode })
             {
                 RadioButton r = radio;
                 r.AutoSize = true;
@@ -289,8 +288,28 @@ namespace AiPets
             appRows.Add(resetApp);
             page.Controls.AddRange(new Control[] { appName, pickApp, appWhere, resetApp });
             y += 34;
-            programRows.Add(AddLabel(page, "Arguments", y));
-            programRows.Add(SetupBox(page, argsBox, y, 330));
+            programRows.Add(AddLabel(page, "CLI arguments", y));
+            argsPresetBox.DropDownStyle = ComboBoxStyle.DropDownList;
+            argsPresetBox.Location = new Point(140, y - 3);
+            argsPresetBox.Width = 330;
+            argsPresetBox.SelectedIndexChanged += delegate
+            {
+                if (loading || current == null || host == null || argsPresetBox.SelectedIndex < 0)
+                    return;
+                string choice = (string)argsPresetBox.SelectedItem;
+                if (choice == "Custom arguments")
+                {
+                    argsBox.Focus();
+                    argsBox.SelectAll();
+                    return;
+                }
+                PetSettings saved = host.SettingsOf(current);
+                string value = choice == "Bypass permissions" ? current.Info.BypassArguments(saved.Program) : "";
+                argsBox.Text = value;
+                host.ChangeSetting(current, "args", value == current.Info.Args ? null : value);
+            };
+            page.Controls.Add(argsPresetBox);
+            programRows.Add(argsPresetBox);
             linkRows.Add(AddLabel(page, "Open in", y));
             var browser = new Label { Text = "Default browser", AutoSize = true, Location = new Point(140, y), ForeColor = Muted };
             page.Controls.Add(browser);
@@ -305,6 +324,9 @@ namespace AiPets
             };
             page.Controls.Add(resetUrl);
             linkRows.Add(resetUrl);
+            y += 34;
+            programRows.Add(AddLabel(page, "Arguments", y));
+            programRows.Add(SetupBox(page, argsBox, y, 330));
             y += 34;
             programRows.Add(AddLabel(page, "Open in", y));
             programRows.Add(shellBox);
@@ -570,10 +592,7 @@ namespace AiPets
                 if (!dirBox.Focused) dirBox.Text = s.WorkDir;
                 if (!urlBox.Focused) urlBox.Text = s.Url;
                 shellBox.SelectedIndex = Math.Max(0, Array.IndexOf(ShellValues, s.Shell));
-                bool hasApp = s.DesktopApp.Length > 0;
-                int gap = appMode.Left - programMode.Left - programMode.PreferredSize.Width;
-                appMode.Visible = hasApp;
-                websiteMode.Left = hasApp ? appMode.Left + appMode.PreferredSize.Width + gap : appMode.Left;
+                ShowArgumentPresets(p.Info, s.Program, argsBox.Text);
                 programMode.Checked = s.OpensProgram;
                 appMode.Checked = s.OpensApp;
                 websiteMode.Checked = s.OpensWebsite;
@@ -605,7 +624,7 @@ namespace AiPets
         {
             DesktopApp app = DesktopApp.Find(s.DesktopApp);
             appName.ForeColor = app != null ? Color.FromArgb(26, 26, 26) : Muted;
-            appName.Text = app != null ? app.ToString() : "not found";
+            appName.Text = app != null ? app.ToString() : s.DesktopApp.Length == 0 ? "Choose an app" : "not found";
             if (viaProgram)
                 appWhere.Text = "A click runs \"" + DesktopApp.ProgramCommand(s, pet.AppCommand)
                     + "\" in the working folder, without a terminal window.";
@@ -628,6 +647,21 @@ namespace AiPets
                 ShowPet(current);
             else
                 state.Text = host.StateText(current);
+        }
+
+        void ShowArgumentPresets(PetInfo pet, string program, string args)
+        {
+            string bypass = pet.BypassArguments(program);
+            Quietly(delegate
+            {
+                argsPresetBox.Items.Clear();
+                argsPresetBox.Items.Add("Standard (no arguments)");
+                if (bypass.Length > 0)
+                    argsPresetBox.Items.Add("Bypass permissions");
+                argsPresetBox.Items.Add("Custom arguments");
+                argsPresetBox.SelectedItem = args.Length == 0 ? "Standard (no arguments)"
+                    : bypass.Length > 0 && args == bypass ? "Bypass permissions" : "Custom arguments";
+            });
         }
 
         void Commit(TextBox box)
@@ -660,8 +694,18 @@ namespace AiPets
             }
             string fallback = key == "program" ? info.Program : key == "args" ? info.Args : key == "url" ? info.Url : null;
             string stored = value == fallback ? null : value;
-            if (stored != host.Settings.Get(info.Id, key))
+            // A preset belongs to its CLI; keep custom arguments, but do not carry a recognized
+            // bypass flag over to an unrelated program when its name is changed.
+            if (key == "program" && saved.Args.Length > 0 && saved.Args == info.BypassArguments(saved.Program)
+                && info.BypassArguments(value).Length == 0 && argsBox.Text.Trim() == saved.Args)
+            {
+                host.ChangeSetting(current, key, stored, "args", info.Args.Length == 0 ? null : "");
+                argsBox.Text = "";
+            }
+            else if (stored != host.Settings.Get(info.Id, key))
                 host.ChangeSetting(current, key, stored);
+            if (key == "program" || key == "args")
+                ShowArgumentPresets(info, host.SettingsOf(current).Program, argsBox.Text.Trim());
         }
 
         void CommitAll()
@@ -695,7 +739,7 @@ namespace AiPets
             using (var dialog = new OpenFileDialog())
             {
                 dialog.Title = "Which app should " + current.Info.Name + " open?";
-                dialog.Filter = "Programme (*.exe)|*.exe";
+                dialog.Filter = "Programs (*.exe)|*.exe";
                 DesktopApp app = DesktopApp.Find(host.SettingsOf(current).DesktopApp);
                 if (app != null && app.Exe != null)
                 {
@@ -826,7 +870,7 @@ namespace AiPets
                     PetSettings s = PetSettings.From(form.current.Info, Store.Load());
                     s.UseMode(mode);
                     if (s.Mode != mode)
-                        continue;   // a pet without a desktop app has no app page
+                        continue;
                     form.snapshotMode = mode;
                     form.ShowPet(form.current);
                     form.SavePng(Path.Combine(dir, "settings-" + mode + ".png"));
