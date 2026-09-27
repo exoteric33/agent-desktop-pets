@@ -30,10 +30,10 @@ Open settings with a left-click on the aipets tray icon. Select a pet, then choo
 | Mode | Configuration |
 | --- | --- |
 | **Website** | An HTTP or HTTPS address in your default browser. A bare domain such as `grok.com` becomes `https://grok.com/`. |
-| **Desktop app** | Available for every pet; use **…** to choose an executable. Presets detect supported Claude, Hermes, Astra, Cursor and Copilot installations. |
+| **Desktop app** | Available for every pet; use **…** to choose an executable. Presets detect supported Claude, Hermes, ChatGPT, Cursor and Copilot installations. |
 | **Program** | Program, CLI arguments preset, editable arguments, terminal and working folder. Windows Terminal is used when available. |
 
-- **Astra:** app mode uses `codex app` in the chosen working folder, without opening a terminal. If the CLI is unavailable, it tries the installed app package directly. Website mode opens `https://chatgpt.com/` by default.
+- **ChatGPT:** app mode uses `codex app` in the chosen working folder, without opening a terminal. If the CLI is unavailable, it tries the installed app package directly. Website mode opens `https://chatgpt.com/` by default.
 - **Hermes:** if Hermes Desktop has not been built, app mode starts `hermes desktop` in a terminal. The first build can take several minutes; later clicks start the built app directly.
 - **Cursor:** the program preset is the `cursor` editor command.
 - **Copilot:** the app preset is Microsoft Copilot. Program mode is available for your own command; it has no preset command.
@@ -49,7 +49,7 @@ In **Program** mode, **CLI arguments** defaults to **Standard (no arguments)**. 
 | --- | --- | --- |
 | Claude | `claude` | `--dangerously-skip-permissions` |
 | Hermes | `hermes` | `--yolo` |
-| Astra | `codex` | `--dangerously-bypass-approvals-and-sandbox` |
+| ChatGPT | `codex` | `--dangerously-bypass-approvals-and-sandbox` |
 | Gemini | `gemini` | `--yolo` |
 | Grok | `grok` | No preset |
 | Cursor | `cursor` (editor command) | No preset |

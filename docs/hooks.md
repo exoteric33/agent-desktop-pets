@@ -65,7 +65,7 @@ Add this to `%USERPROFILE%\.codex\hooks.json` (or `%CODEX_HOME%\hooks.json`) and
 
 Codex only runs new hooks once you have approved them: open `/hooks` in Codex and mark the six aipets hooks as trusted. If you change a command (e.g. because the exe moved), Codex asks again.
 
-Codex question tracking needs no additional hook. The normal Codex hooks identify the session; Astra reads its local transcript to detect question-tool requests and shows "?" until you answer. Transcript updates are read incrementally in the background, keeping questions visible during long sessions and retrying if the file is temporarily locked.
+Codex question tracking needs no additional hook. The normal Codex hooks identify the session; ChatGPT reads its local transcript to detect question-tool requests and shows "?" until you answer. Transcript updates are read incrementally in the background, keeping questions visible during long sessions and retrying if the file is temporarily locked.
 
 ## Cursor
 

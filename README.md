@@ -4,7 +4,7 @@
 
 Keep your favorite AI tools just above your taskbar as little characters. Click a pet to open its website, desktop app or terminal. Supported agents also show when they are **working**, **need your input** or **have finished**.
 
-![The seven aipets characters: Claude, Hermes, Astra, Gemini, Grok, Cursor and Copilot](docs/images/pets.png)
+![The seven aipets characters: Claude, Hermes, ChatGPT, Gemini, Grok, Cursor and Copilot](docs/images/pets.png)
 
 All seven pets use animated pixel art.
 
@@ -20,11 +20,11 @@ All seven pets use animated pixel art.
 
 ## See the status at a glance
 
-Real desktop screenshots with Claude and Astra:
+Real desktop screenshots with Claude and ChatGPT:
 
 | Working | Waiting for you | Done |
 | :---: | :---: | :---: |
-| <img src="docs/images/status-working.png" alt="Claude and Astra with working indicators above them" width="250"> | <img src="docs/images/status-waiting.png" alt="Claude and Astra with question marks when input is needed" width="250"> | <img src="docs/images/status-done.png" alt="Claude and Astra with green check marks after finishing" width="250"> |
+| <img src="docs/images/status-working.png" alt="Claude and ChatGPT with working indicators above them" width="250"> | <img src="docs/images/status-waiting.png" alt="Claude and ChatGPT with question marks when input is needed" width="250"> | <img src="docs/images/status-done.png" alt="Claude and ChatGPT with green check marks after finishing" width="250"> |
 
 ### A few ways to use it
 
@@ -51,19 +51,19 @@ Use the source ZIP for the features shown here; the existing `v0.1.0-rc.1` binar
 | --- | --- | --- |
 | **Claude** | Claude website | Working, waiting, done |
 | **Hermes** | Hermes Agent website | Working, approval waiting, done |
-| **Astra (Codex)** | ChatGPT website | Working, waiting, done; also supports Codex desktop sessions |
+| **ChatGPT (Codex)** | ChatGPT website | Working, waiting, done; also supports Codex desktop sessions |
 | **Gemini** | Gemini website | No integration |
 | **Grok** | Grok website | No integration |
 | **Cursor** | Cursor website | Working and done |
 | **Copilot** | Microsoft Copilot website | No integration |
 
-Switch **Click opens** in settings or the pet's right-click menu: **Website → Desktop app → Program**. Every pet supports a custom desktop executable as well as a website or program. Desktop app presets are available for Claude, Hermes, Astra, Cursor and Copilot. Astra's website is **chatgpt.com**. Copilot is **Microsoft Copilot**.
+Switch **Click opens** in settings or the pet's right-click menu: **Website → Desktop app → Program**. Every pet supports a custom desktop executable as well as a website or program. Desktop app presets are available for Claude, Hermes, ChatGPT, Cursor and Copilot. ChatGPT's website is **chatgpt.com**. Copilot is **Microsoft Copilot**.
 
 Status depends on the agent's hooks, independently of the chosen click action. Opening a website does not let aipets read that chat's status. Clicking a waiting pet opens the configured tool; it does not select the specific waiting conversation.
 
 ## How it works
 
-aipets runs locally as a Windows tray app, with one process per visible pet. Agent hooks write small status files that update the bubbles. Astra also reads local Codex transcripts to detect questions. Settings, logs and status files live in `%APPDATA%\aipets`; your AI tools handle the conversations.
+aipets runs locally as a Windows tray app, with one process per visible pet. Agent hooks write small status files that update the bubbles. ChatGPT also reads local Codex transcripts to detect questions. Settings, logs and status files live in `%APPDATA%\aipets`; your AI tools handle the conversations.
 
 ## Everyday controls
 
