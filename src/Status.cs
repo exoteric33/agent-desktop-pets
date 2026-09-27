@@ -421,11 +421,13 @@ namespace AiPets
     sealed class StatusMonitor
     {
         const int TailBytes = 16 * 1024;
+        const int CodexTailBytes = 512 * 1024;   // Codex rollout lines reach tens of KB (encrypted reasoning)
 
         readonly string folder;
         readonly bool claudeTranscripts, codex, transcripts;
         readonly long staleMs;
         readonly Dictionary<string, long> checkedTranscripts = new Dictionary<string, long>();
+        readonly Dictionary<string, bool> codexQuestions = new Dictionary<string, bool>();
 
         public AgentState State { get; private set; }
         public long LatestDone { get; private set; }
@@ -463,6 +465,12 @@ namespace AiPets
                 {
                     // terminal closed without a session-end hook
                     TryDelete(path);
+                    continue;
+                }
+                if (codex && CodexAsks(s.Extra))
+                {
+                    // a question stays open through Stop and, after the async variant, while Codex keeps working
+                    waiting = true;
                     continue;
                 }
                 if (s.State == AgentState.Working || s.State == AgentState.Waiting)
@@ -528,6 +536,65 @@ namespace AiPets
             }
             catch (IOException) { }
             catch (UnauthorizedAccessException) { }
+            return false;
+        }
+
+        /// <summary>
+        /// Codex asks through its request_user_input tools, which fire no hook (tool hooks only cover shell,
+        /// patch and MCP tools), and with --dangerously-bypass-approvals-and-sandbox PermissionRequest never
+        /// fires either. So the rollout transcript decides: request_user_input (Plan mode) is open until its
+        /// function_call_output, request_user_input_async returns at once and is open until the next turn starts.
+        /// </summary>
+        bool CodexAsks(string transcript)
+        {
+            long written = TranscriptTime(transcript);
+            if (written == 0)
+                return false;
+            bool asks;
+            if (codexQuestions.TryGetValue(transcript, out asks) && checkedTranscripts.ContainsKey(transcript)
+                && checkedTranscripts[transcript] == written)
+                return asks;
+            asks = false;
+            try
+            {
+                string tail;
+                using (var fs = new FileStream(transcript, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                {
+                    fs.Seek(Math.Max(0, fs.Length - CodexTailBytes), SeekOrigin.Begin);
+                    using (var reader = new StreamReader(fs, Encoding.UTF8))
+                        tail = reader.ReadToEnd();
+                }
+                asks = CodexAsks(tail.Split('\n'));
+            }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+            checkedTranscripts[transcript] = written;
+            codexQuestions[transcript] = asks;
+            return asks;
+        }
+
+        /// <summary>Rollout lines, oldest first (line 0 may be cut off): is a question from the current turn open?</summary>
+        internal static bool CodexAsks(string[] lines)
+        {
+            var answered = new HashSet<string>();
+            for (int i = lines.Length - 1; i > 0; i--)
+            {
+                string line = lines[i];
+                if (line.Contains("\"type\":\"task_started\""))
+                    return false;
+                string callId = Regex.Match(line, "\"call_id\":\"([^\"]+)\"").Groups[1].Value;
+                if (line.Contains("\"type\":\"function_call_output\""))
+                {
+                    answered.Add(callId);
+                    continue;
+                }
+                if (!line.Contains("\"type\":\"function_call\""))
+                    continue;
+                if (line.Contains("\"name\":\"request_user_input_async\""))
+                    return true;
+                if (line.Contains("\"name\":\"request_user_input\"") && !answered.Contains(callId))
+                    return true;
+            }
             return false;
         }
 

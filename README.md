@@ -123,6 +123,8 @@ Add this to `%USERPROFILE%\.codex\hooks.json` (or `%CODEX_HOME%\hooks.json`) and
 
 Codex only runs new hooks once you have approved them: open `/hooks` in Codex and mark the six aipets hooks as trusted. If you change a command (e.g. because the exe moved), Codex asks again.
 
+The "?" for Codex questions needs no hook: Codex fires none for its question tools, so Astra reads the session transcript instead and shows "?" until you answer.
+
 ### Cursor
 
 Add this to `%USERPROFILE%\.cursor\hooks.json` and adjust the path. On Windows, Cursor runs hook commands through PowerShell and passes the event in the data the hook receives. That is why only the path is given here, without arguments. If it contains spaces, put it in single quotes, e.g. `"command": "'C:\\Program Files\\aipets\\aipets.exe'"`.
