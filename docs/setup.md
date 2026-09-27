@@ -53,13 +53,13 @@ The shipped program presets use these arguments:
 
 These flags bypass the agents' usual permission prompts; the Codex flag also disables its sandbox. To use the tools' normal defaults, choose **Program** mode in settings and remove the flag from **Arguments** before launching.
 
-## Appearance, size and visibility
+## Size and visibility
 
 - **Move:** drag a pet anywhere. It snaps near the taskbar and faces toward the screen center. Dragging brings it in front of the other pets, and that order survives restarts.
 - **Size of all pets:** sets every pet to the same height and replaces individual height overrides.
 - **Size of a single pet:** changes just that pet until the shared slider is moved again. **like all** restores the shared height.
 - **Size range:** 162 pixels up to the available screen height. A pet is reduced to fit if its screen is too small.
-- **Appearance:** Cursor and Copilot offer **Pixel** and **Original**. Both are animated. Switching preserves position, size and visibility.
+- **Pixel art:** all seven pets use their pixel artwork. Older saved appearance preferences are ignored.
 - **Show:** enable or hide individual pets. Hidden pets stay hidden across restarts.
 - **Hide all pets:** hides the entire group without losing the individual selection. While it is active, individual **Show** controls are disabled. This setting also survives restarts.
 - **Fullscreen apps:** pets hide automatically while another application is fullscreen.

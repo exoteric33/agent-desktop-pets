@@ -6,7 +6,7 @@ Keep your favorite AI tools just above your taskbar as little characters. Click 
 
 ![The seven aipets characters: Claude, Hermes, Astra, Gemini, Grok, Cursor and Copilot](docs/images/pets.png)
 
-Pixel art by default. Cursor and Copilot also have an animated **Original** look.
+All seven pets use animated pixel art.
 
 [Get started](#get-started) · [Supported pets](#supported-pets) · [Setup guide](docs/setup.md) · [Status hooks](docs/hooks.md)
 
@@ -71,7 +71,7 @@ aipets runs locally as a Windows tray app, with one process per visible pet. Age
 | --- | --- |
 | Open an AI tool | Left-click its pet |
 | Move a pet / bring it to the front | Drag it |
-| Change its click action, size or appearance | Right-click the pet, or open settings |
+| Change its click action or size | Right-click the pet, or open settings |
 | Set all pets to the same height | Move **Size of all pets**; this replaces individual sizes |
 | Hide everything temporarily | Turn on **Hide all pets** in settings or the tray menu; turning it off restores your selection |
 | Change startup behavior | Toggle **Start with Windows** |

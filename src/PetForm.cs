@@ -40,7 +40,6 @@ namespace AiPets
         readonly PetInfo pet;
         readonly Process host;          // the tray that started this pet; null when run on its own
         Atlas atlas;
-        string loadedStyle;
         readonly ContextMenuStrip menu;
         readonly System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer();
         readonly Stopwatch clock = Stopwatch.StartNew();
@@ -92,7 +91,7 @@ namespace AiPets
             if (!Store.TryLoad(out initial))
                 throw new IOException("The pet settings cannot be read right now.");
             settings = PetSettings.From(pet, initial);
-            LoadAppearance(settings.Style);
+            LoadSprites();
             status = pet.Status.Length > 0 ? new StatusMonitor(pet.Status) : null;
             allPets = PetInfo.Discover();
             layerOrder = Layers.Order(initial, allPets);
@@ -190,13 +189,10 @@ namespace AiPets
             base.Dispose(disposing);
         }
 
-        void LoadAppearance(string style)
+        void LoadSprites()
         {
-            // Decode first: an unreadable replacement must not discard the working atlas.
-            Atlas replacement = Atlas.Load(pet.StyleDir(style));
-            Atlas previous = atlas;
-            atlas = replacement;
-            loadedStyle = style;
+            // Always use pixel sprites, including after an upgrade with an old style setting or extra assets.
+            atlas = Atlas.Load(pet.SpritesDir);
             canBounce = atlas.HasFrame("bounce_1");
             hasHover = atlas.HasFrame("hover_0");
             hasLook = atlas.HasFrame("look_0");
@@ -207,11 +203,6 @@ namespace AiPets
             spinFrames = atlas.Anim("spin", PulseSpinner);
             twinkles = atlas.AnimsWithPrefix("twinkle");
             if (twinkles.Count == 0) twinkles.Add(SparkFrames);
-            phase = 0;
-            bounceAt = -1;
-            particles.Clear();
-            lastRender = null;
-            if (previous != null) previous.Dispose();
         }
 
         // ------------------------------------------------------------------ geometry
@@ -347,16 +338,6 @@ namespace AiPets
                 nextRestack = Layers.NextCheck(StatusEntry.UnixNow(), order.IndexOf(pet.Id));
                 Restack();
             }
-            bool appearanceChanged = s.Style != loadedStyle;
-            if (appearanceChanged)
-            {
-                try { LoadAppearance(s.Style); }
-                catch (Exception ex)
-                {
-                    Log.Write("appearance unchanged: " + ex.Message);
-                    appearanceChanged = false;
-                }
-            }
             int newHeight = FitScreen(anchor, s.PetHeight());
             settings = s;
             if (newHeight != height)
@@ -366,12 +347,6 @@ namespace AiPets
                     MoveTo(HomeAnchor(), true);
                 SavePosition();
                 return;
-            }
-            if (appearanceChanged)
-            {
-                if (IsHandleCreated) ApplyHeight(newHeight);
-                else SetHeight(newHeight);
-                // An appearance switch never writes the user's position or size.
             }
             if (dragging)
                 return;
@@ -711,48 +686,44 @@ namespace AiPets
             Directory.CreateDirectory(dir);
             using (var pet = new PetForm(info, null))
             {
-                foreach (string style in info.HasOriginal ? new[] { "pixel", "original" } : new[] { "pixel" })
+                pet.zoom = 3;   // whole cell pixels, for checking the art
+                foreach (bool mirror in new[] { false, true })
                 {
-                    if (pet.loadedStyle != style) pet.LoadAppearance(style);
-                    pet.zoom = 3;   // whole cell pixels, for checking the art
-                    foreach (bool mirror in new[] { false, true })
+                    pet.mirrored = mirror;
+                    string side = pet.LooksLeft ? "_left" : "_right";
+                    string prefix = Path.Combine(dir, info.Id + "_");
+                    pet.SnapshotState(prefix + "idle" + side, delegate { });
+                    pet.SnapshotState(prefix + "hover" + side, delegate
                     {
-                        pet.mirrored = mirror;
-                        string side = pet.LooksLeft ? "_left" : "_right";
-                        string prefix = Path.Combine(dir, info.Id + (info.HasOriginal ? "_" + style : "") + "_");
-                        pet.SnapshotState(prefix + "idle" + side, delegate { });
-                        pet.SnapshotState(prefix + "hover" + side, delegate
+                        pet.hovered = true;
+                        pet.hoverSince = pet.now - 1000;
+                    });
+                    pet.SnapshotState(prefix + "look" + side, delegate { pet.lookUntil = pet.now + 1000; });
+                    pet.SnapshotState(prefix + "sleep" + side, delegate
+                    {
+                        pet.sleeping = true;
+                        for (int i = 0; i < 3; i++)
                         {
-                            pet.hovered = true;
-                            pet.hoverSince = pet.now - 1000;
-                        });
-                        pet.SnapshotState(prefix + "look" + side, delegate { pet.lookUntil = pet.now + 1000; });
-                        pet.SnapshotState(prefix + "sleep" + side, delegate
-                        {
-                            pet.sleeping = true;
-                            for (int i = 0; i < 3; i++)
-                            {
-                                pet.SpawnZ();
-                                pet.now += 800;
-                            }
-                        });
-                        pet.SnapshotState(prefix + "click" + side, delegate
-                        {
-                            pet.bounceAt = pet.now;
-                            pet.happyUntil = pet.now + 1400;
-                            pet.Burst();
-                            pet.now += 260;
-                        });
-                        pet.SnapshotState(prefix + "working" + side, delegate
-                        {
-                            pet.agent = AgentState.Working;
-                            pet.now = 110 * 196 - 360;
-                            pet.SpawnTwinkle();
-                            pet.now = 110 * 196;   // biggest frame of the pulse spinner
-                        });
-                        pet.SnapshotState(prefix + "waiting" + side, delegate { pet.agent = AgentState.Waiting; });
-                        pet.SnapshotState(prefix + "done" + side, delegate { pet.doneShownSince = 1; });
-                    }
+                            pet.SpawnZ();
+                            pet.now += 800;
+                        }
+                    });
+                    pet.SnapshotState(prefix + "click" + side, delegate
+                    {
+                        pet.bounceAt = pet.now;
+                        pet.happyUntil = pet.now + 1400;
+                        pet.Burst();
+                        pet.now += 260;
+                    });
+                    pet.SnapshotState(prefix + "working" + side, delegate
+                    {
+                        pet.agent = AgentState.Working;
+                        pet.now = 110 * 196 - 360;
+                        pet.SpawnTwinkle();
+                        pet.now = 110 * 196;   // biggest frame of the pulse spinner
+                    });
+                    pet.SnapshotState(prefix + "waiting" + side, delegate { pet.agent = AgentState.Waiting; });
+                    pet.SnapshotState(prefix + "done" + side, delegate { pet.doneShownSince = 1; });
                 }
             }
         }
@@ -1031,10 +1002,6 @@ namespace AiPets
             var openApp = new ToolStripMenuItem("Desktop app", null, delegate { SetMode("app"); });
             var openWebsite = new ToolStripMenuItem("Website", null, delegate { SetMode("website"); });
             opens.DropDownItems.AddRange(new ToolStripItem[] { openProgram, openApp, openWebsite });
-            var appearance = new ToolStripMenuItem("Appearance");
-            var pixel = new ToolStripMenuItem("Pixel", null, delegate { SetStyle("pixel"); });
-            var original = new ToolStripMenuItem("Original", null, delegate { SetStyle("original"); });
-            appearance.DropDownItems.AddRange(new ToolStripItem[] { pixel, original });
             // heights of all pets (Tag = px), then this pet's own, each group under a grey heading
             var sizes = new ToolStripMenuItem("Size");
             var shared = new List<ToolStripMenuItem>();
@@ -1073,14 +1040,11 @@ namespace AiPets
 
             strip.Items.AddRange(new ToolStripItem[]
             {
-                open, folder, opens, appearance, new ToolStripSeparator(), sizes, home, hide, new ToolStripSeparator(), prefs, quit,
+                open, folder, opens, new ToolStripSeparator(), sizes, home, hide, new ToolStripSeparator(), prefs, quit,
             });
             strip.Opening += delegate
             {
                 PetSettings s = ReadSettings();
-                appearance.Visible = pet.HasOriginal;
-                pixel.Checked = s.Style == "pixel";
-                original.Checked = s.Style == "original";
                 folder.Text = "Folder: " + ShortPath(s.WorkDir) + " …";
                 folder.ToolTipText = s.WorkDir;
                 // only the terminal and an app opened by the program (codex app) use the working folder
@@ -1131,7 +1095,7 @@ namespace AiPets
         /// <summary>A height this pet wrote itself: apply it now instead of waiting for the file stamp.</summary>
         void TakeOwnChange()
         {
-            // Apply simultaneous appearance changes before acknowledging the file stamp.
+            // Apply any simultaneous settings changes before acknowledging the file stamp.
             ReloadSettings();
         }
 
@@ -1139,12 +1103,6 @@ namespace AiPets
         void SetMode(string mode)
         {
             Store.Update(pet.Id, "mode", mode == pet.Mode ? null : mode);
-        }
-
-        void SetStyle(string style)
-        {
-            Store.Update(pet.Id, "style", style == "original" ? "original" : null);
-            ReloadSettings();
         }
 
         /// <summary>Tooltip of "Desktop app": which app a click opens and how, or what happens without one.</summary>

@@ -41,8 +41,6 @@ namespace AiPets
         readonly RadioButton programMode = new RadioButton(), appMode = new RadioButton(), websiteMode = new RadioButton();
         readonly TextBox programBox = new TextBox(), argsBox = new TextBox(), dirBox = new TextBox(), urlBox = new TextBox();
         readonly ComboBox shellBox = new ComboBox();
-        readonly ComboBox styleBox = new ComboBox();
-        readonly Label styleLabel = new Label();
         readonly Button openButton = new Button(), homeButton = new Button();
         // "Click opens: Program" shows program, arguments, terminal and folder; "Desktop app" the app
         // (and the folder, if the program opens the app: codex app); "Website" only the link
@@ -52,7 +50,6 @@ namespace AiPets
         Ini shownIni;
         bool loading;
         string snapshotMode;   // snapshot only: show the page in this mode instead of the saved one
-        string snapshotStyle;
 
         public SettingsForm(TrayHost host)
         {
@@ -180,21 +177,6 @@ namespace AiPets
                     host.SetEnabled(current, showBox.Checked);
             };
             page.Controls.AddRange(new Control[] { avatar, title, state, showBox });
-
-            styleLabel.Text = "Appearance";
-            styleLabel.AutoSize = true;
-            styleLabel.Location = new Point(292, 89);
-            styleBox.DropDownStyle = ComboBoxStyle.DropDownList;
-            styleBox.Items.AddRange(new[] { "Pixel", "Original" });
-            styleBox.Location = new Point(358, 85);
-            styleBox.Width = 112;
-            styleBox.SelectedIndexChanged += delegate
-            {
-                if (loading || current == null || host == null || styleBox.SelectedIndex < 0) return;
-                host.ChangeSetting(current, "style", styleBox.SelectedIndex == 1 ? "original" : null);
-                ShowPet(current);
-            };
-            page.Controls.AddRange(new Control[] { styleLabel, styleBox });
 
             // two height sliders, both live: the pets follow while a slider moves.
             // All pets: every pet snaps to it, own heights go. This pet: her own height until the next
@@ -562,7 +544,6 @@ namespace AiPets
             PetSettings s = PetSettings.From(p.Info, ini);
             if (snapshotMode != null)
                 s.UseMode(snapshotMode);
-            if (snapshotStyle != null) s.Style = snapshotStyle;
             loading = true;
             try
             {
@@ -570,13 +551,11 @@ namespace AiPets
                 {
                     title.Text = p.Info.Name;
                 }
-                avatar.Image = LoadIcon(p.Info, 48, s.Style);
+                avatar.Image = LoadIcon(p.Info, 48);
                 state.Text = host != null ? host.StateText(p) : "–";
                 showBox.Checked = s.Enabled;
                 showBox.Enabled = !s.AllHidden;   // her own choice waits until all pets are shown again
                 hideAllBox.Checked = s.AllHidden;
-                styleLabel.Visible = styleBox.Visible = p.Info.HasOriginal;
-                styleBox.SelectedIndex = s.Style == "original" ? 1 : 0;
                 petSizeLabel.Text = "Size of " + p.Info.Name;
                 // not while a slider is dragged or its value still waits to be written: the thumb would jump back
                 if (pendingShared == 0 && pendingOwn == 0 && !sizeBar.Capture && !petSizeBar.Capture)
@@ -745,15 +724,15 @@ namespace AiPets
 
         readonly Dictionary<string, Image> icons = new Dictionary<string, Image>();
 
-        Image LoadIcon(PetInfo pet, int size, string style = "pixel")
+        Image LoadIcon(PetInfo pet, int size)
         {
-            string key = pet.Id + "/" + size + "/" + style;
+            string key = pet.Id + "/" + size;
             Image image;
             if (!icons.TryGetValue(key, out image))
             {
                 try
                 {
-                    using (var icon = new Icon(Path.Combine(pet.StyleDir(style), "icon.ico"), size, size))
+                    using (var icon = new Icon(pet.IconPath, size, size))
                         image = icon.ToBitmap();
                 }
                 catch (Exception)
@@ -851,13 +830,6 @@ namespace AiPets
                     form.snapshotMode = mode;
                     form.ShowPet(form.current);
                     form.SavePng(Path.Combine(dir, "settings-" + mode + ".png"));
-                }
-                if (form.current != null && form.current.Info.HasOriginal)
-                {
-                    form.snapshotMode = form.current.Info.Mode;
-                    form.snapshotStyle = "original";
-                    form.ShowPet(form.current);
-                    form.SavePng(Path.Combine(dir, "settings-original.png"));
                 }
                 form.Close();
             }
